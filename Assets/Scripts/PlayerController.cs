@@ -3,103 +3,135 @@ using UnityEngine;
 /// <summary>
 /// Handles 3-lane runner movement: left/right lane switching, jump, slide,
 /// gravity, and collision detection with obstacles/coins/trains.
-/// Works with swipe input (mobile) or arrow keys (testing in editor).
+///
+/// Cancel moves (matching the original game feel):
+///   Jump → Slide: swipe/press down while airborne → slams player to ground fast,
+///                 then auto-enters slide the moment they land.
+///   Slide → Jump: swipe/press up while sliding → instantly cancels slide,
+///                 restores collider, and fires a full jump.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
     [Header("Lane Settings")]
-    public float laneDistance = 2.5f;   // distance between lanes
-    public float laneChangeSpeed = 12f; // how fast player slides between lanes
-    private int currentLane = 0;        // -1 = left, 0 = center, 1 = right
+    public float laneDistance    = 2.5f;
+    public float laneChangeSpeed = 12f;
+    private int currentLane = 0;   // -1 left | 0 center | 1 right
 
     [Header("Jump / Slide")]
-    public float jumpForce = 9f;
-    public float gravity = -25f;
-    public float slideDuration = 0.6f;
+    public float jumpForce           = 9f;
+    public float gravity             = -25f;
+    public float slideDuration       = 0.6f;
+
+    [Tooltip("Extra downward force added when the player cancels a jump into a slide mid-air." +
+             " Higher = hits the ground faster.")]
+    public float jumpCancelSlamForce = 22f;
 
     [Header("Animation (optional)")]
     public Animator animator;
 
+    // ── Components ──────────────────────────────────────────────────────────
     private CharacterController controller;
     private Vector3 velocity;
     private bool isGrounded;
-    private bool isSliding;
+    private bool wasGrounded;          // track landing frame
+
+    // ── Slide state ─────────────────────────────────────────────────────────
+    private bool  isSliding;
     private float slideTimer;
 
-    // Original collider size, used to shrink collider while sliding
-    private Vector3 originalCenter;
-    private float originalHeight;
+    // ── Jump-cancel-into-slide ───────────────────────────────────────────────
+    // Player pressed Down while airborne: slam them to ground, then auto-slide.
+    private bool isSlamming;
+    private bool pendingSlideOnLand;
 
+    // ── Collider cache ───────────────────────────────────────────────────────
+    private Vector3 originalCenter;
+    private float   originalHeight;
+
+    // ── Swipe input ─────────────────────────────────────────────────────────
     [Header("Swipe Input")]
-    public float minSwipeDistance = 50f; // pixels
+    public float minSwipeDistance = 50f;
     private Vector2 touchStartPos;
-    private bool trackingTouch;
+    private bool    trackingTouch;
+
+    // ────────────────────────────────────────────────────────────────────────
 
     private void Awake()
     {
-        controller = GetComponent<CharacterController>();
+        controller     = GetComponent<CharacterController>();
         originalCenter = controller.center;
         originalHeight = controller.height;
     }
 
     public void ResetPlayer()
     {
-        currentLane = 0;
-        velocity = Vector3.zero;
-        isSliding = false;
-        slideTimer = 0f;
-        controller.center = originalCenter;
-        controller.height = originalHeight;
+        currentLane        = 0;
+        velocity           = Vector3.zero;
+        isSliding          = false;
+        isSlamming         = false;
+        pendingSlideOnLand = false;
+        slideTimer         = 0f;
+        RestoreCollider();
         transform.position = new Vector3(0f, transform.position.y, transform.position.z);
         if (animator) animator.Rebind();
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  UPDATE
+    // ════════════════════════════════════════════════════════════════════════
 
     private void Update()
     {
         if (GameManager.Instance.CurrentState != GameManager.GameState.Playing) return;
 
+        wasGrounded = isGrounded;
+        isGrounded  = controller.isGrounded;
+
+        DetectLanding();
         HandleInput();
         HandleSlideTimer();
-
-        // --- Combine all movement into ONE controller.Move() call per frame ---
-        // Mixing direct transform.position writes with controller.Move() causes
-        // the CharacterController to fight/override lane changes. Build a single
-        // displacement vector instead.
-
-        // 1. Lane (x) - move toward target lane position smoothly
-        float targetX = currentLane * laneDistance;
-        float deltaX = Mathf.MoveTowards(transform.position.x, targetX, Time.deltaTime * laneChangeSpeed * laneDistance) - transform.position.x;
-
-        // 2. Vertical (y) - gravity/jump
-        isGrounded = controller.isGrounded;
-        if (isGrounded && velocity.y < 0)
-            velocity.y = -2f;
-        velocity.y += gravity * Time.deltaTime;
-
-        // 3. Forward (z)
-        float forwardSpeed = GameManager.Instance.CurrentSpeed;
-
-        Vector3 frameMovement = new Vector3(deltaX, velocity.y * Time.deltaTime, forwardSpeed * Time.deltaTime);
-        controller.Move(frameMovement);
-
-        if (animator) animator.SetBool("IsGrounded", isGrounded);
+        ApplyMovement();
     }
 
-    // ---------------- INPUT ----------------
+    // ────────────────────────────────────────────────────────────────────────
+    //  LANDING DETECTION
+    //  Runs before input so pendingSlideOnLand is consumed this same frame.
+    // ────────────────────────────────────────────────────────────────────────
+
+    private void DetectLanding()
+    {
+        bool justLanded = isGrounded && !wasGrounded;
+
+        if (justLanded)
+        {
+            isSlamming = false;
+
+            if (pendingSlideOnLand)
+            {
+                pendingSlideOnLand = false;
+                BeginSlide();          // auto-slide on landing after slam
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  INPUT
+    // ════════════════════════════════════════════════════════════════════════
 
     private void HandleInput()
     {
-        // Keyboard (editor testing)
-        if (Input.GetKeyDown(KeyCode.LeftArrow)) ChangeLane(-1);
+        // ── Keyboard (editor / desktop) ──────────────────────────────────────
+        if (Input.GetKeyDown(KeyCode.LeftArrow))  ChangeLane(-1);
         if (Input.GetKeyDown(KeyCode.RightArrow)) ChangeLane(1);
-        if (Input.GetKeyDown(KeyCode.UpArrow)) Jump();
-        if (Input.GetKeyDown(KeyCode.DownArrow)) Slide();
+        if (Input.GetKeyDown(KeyCode.UpArrow))    OnUpInput();
+        if (Input.GetKeyDown(KeyCode.DownArrow))  OnDownInput();
 
-        // Touch / swipe
+        // ── Touch / swipe ────────────────────────────────────────────────────
         if (Input.touchCount > 0)
         {
             Touch touch = Input.GetTouch(0);
+
             if (touch.phase == TouchPhase.Began)
             {
                 touchStartPos = touch.position;
@@ -113,43 +145,102 @@ public class PlayerController : MonoBehaviour
                 if (delta.magnitude < minSwipeDistance) return;
 
                 if (Mathf.Abs(delta.x) > Mathf.Abs(delta.y))
-                {
                     ChangeLane(delta.x > 0 ? 1 : -1);
-                }
+                else if (delta.y > 0)
+                    OnUpInput();
                 else
-                {
-                    if (delta.y > 0) Jump();
-                    else Slide();
-                }
+                    OnDownInput();
             }
+        }
+    }
+
+    // ── Unified directional handlers ─────────────────────────────────────────
+
+    /// Up input:
+    ///   • Grounded + not sliding → normal jump
+    ///   • Sliding → CANCEL slide immediately, then jump  (Slide → Jump cancel)
+    ///   • Airborne (and not already slamming) → ignored (no double-jump)
+    private void OnUpInput()
+    {
+        if (isSliding)
+        {
+            // ── Slide → Jump cancel ───────────────────────────────────────────
+            CancelSlide();
+            ForceJump();
+        }
+        else if (isGrounded)
+        {
+            ForceJump();
+        }
+        // airborne + not sliding: ignore (extend to double-jump here if desired)
+    }
+
+    /// Down input:
+    ///   • Grounded + not sliding → normal slide
+    ///   • Airborne (not slamming) → CANCEL jump, slam down  (Jump → Slide cancel)
+    ///   • Already slamming → ignore (already committed)
+    ///   • Already sliding  → ignore
+    private void OnDownInput()
+    {
+        if (!isGrounded && !isSlamming)
+        {
+            // ── Jump → Slide cancel ───────────────────────────────────────────
+            // Spike velocity downward and queue a slide for when we land.
+            velocity.y        = -jumpCancelSlamForce;
+            isSlamming        = true;
+            pendingSlideOnLand = true;
+
+            if (animator) animator.SetTrigger("Slam"); // optional "tuck" animation
+        }
+        else if (isGrounded && !isSliding)
+        {
+            BeginSlide();
         }
     }
 
     private void ChangeLane(int direction)
     {
-        int targetLane = Mathf.Clamp(currentLane + direction, -1, 1);
-        currentLane = targetLane;
+        currentLane = Mathf.Clamp(currentLane + direction, -1, 1);
     }
 
-    private void Jump()
+    // ════════════════════════════════════════════════════════════════════════
+    //  JUMP & SLIDE INTERNALS
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void ForceJump()
     {
-        if (!isGrounded || isSliding) return;
         velocity.y = jumpForce;
         isGrounded = false;
         if (animator) animator.SetTrigger("Jump");
     }
 
-    private void Slide()
+    private void BeginSlide()
     {
-        if (isSliding || !isGrounded) return;
-        isSliding = true;
+        isSliding  = true;
         slideTimer = slideDuration;
 
-        // Shrink collider so player can pass under low obstacles
-        controller.height = originalHeight * 0.5f;
-        controller.center = new Vector3(originalCenter.x, originalCenter.y * 0.5f, originalCenter.z);
+        // Shrink collider so the player can pass under low obstacles
+        float slideHeight    = originalHeight * 0.5f;
+
+        // Keep the BOTTOM of the collider pinned at its original floor position.
+        // CharacterController bottom = center.y - height/2
+        // So: newCenter.y = originalBottom + newHeight/2
+        float originalBottom = originalCenter.y - originalHeight * 0.5f;
+        float slideCenterY   = originalBottom + slideHeight * 0.5f;
+
+        controller.height = slideHeight;
+        controller.center = new Vector3(originalCenter.x, slideCenterY, originalCenter.z);
 
         if (animator) animator.SetTrigger("Slide");
+    }
+
+    /// Instantly end an active slide — used by the Slide → Jump cancel.
+    private void CancelSlide()
+    {
+        isSliding  = false;
+        slideTimer = 0f;
+        RestoreCollider();
+        // No "EndSlide" trigger needed; Jump trigger will override the anim.
     }
 
     private void HandleSlideTimer()
@@ -159,12 +250,53 @@ public class PlayerController : MonoBehaviour
         if (slideTimer <= 0f)
         {
             isSliding = false;
-            controller.height = originalHeight;
-            controller.center = originalCenter;
+            RestoreCollider();
+            if (animator) animator.SetTrigger("EndSlide");
         }
     }
 
-    // ---------------- COLLISIONS ----------------
+    private void RestoreCollider()
+    {
+        controller.height = originalHeight;
+        controller.center = originalCenter;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  MOVEMENT (all axes in one Move call)
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void ApplyMovement()
+    {
+        // 1. Lane (X) ─ lerp toward target lane
+        float targetX = currentLane * laneDistance;
+        float deltaX  = Mathf.MoveTowards(transform.position.x, targetX,
+                            Time.deltaTime * laneChangeSpeed * laneDistance)
+                        - transform.position.x;
+
+        // 2. Vertical (Y) ─ gravity always applies; slam amplifies it
+        if (isGrounded && velocity.y < 0)
+            velocity.y = -2f;                         // keep grounded flag stable
+
+        velocity.y += gravity * Time.deltaTime;
+
+        // 3. Forward (Z)
+        float forwardSpeed = GameManager.Instance.CurrentSpeed;
+
+        controller.Move(new Vector3(deltaX,
+                                    velocity.y * Time.deltaTime,
+                                    forwardSpeed * Time.deltaTime));
+
+        if (animator)
+        {
+            animator.SetBool("IsGrounded", isGrounded);
+            animator.SetBool("IsSliding",  isSliding);
+            animator.SetBool("IsSlamming", isSlamming);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  COLLISIONS
+    // ════════════════════════════════════════════════════════════════════════
 
     private void OnTriggerEnter(Collider other)
     {
@@ -174,12 +306,10 @@ public class PlayerController : MonoBehaviour
         }
         else if (other.CompareTag("Obstacle"))
         {
-            // Allow slide-under / jump-over obstacles tagged specifically
             ObstacleHit obstacle = other.GetComponent<ObstacleHit>();
             if (obstacle != null && obstacle.CanBeAvoided(isSliding, !isGrounded))
-            {
                 return; // successfully avoided
-            }
+
             HandleDeath();
         }
         else if (other.CompareTag("PowerUp"))

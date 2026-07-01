@@ -95,7 +95,13 @@ public class GameManager : MonoBehaviour
         if (gameOverPanel) gameOverPanel.SetActive(true);
 
         // Optional: slow-mo death effect instead of hard stop
+        Invoke(nameof(StopTime), 2.0f);
+    }
+
+    private void StopTime()
+    {
         Time.timeScale = 0f;
+        
     }
 
     public void RestartGame()
