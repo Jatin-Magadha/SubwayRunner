@@ -1116,6 +1116,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   tilePrefabs:
   - {fileID: 8072157331292172440, guid: 4327756711d3b4a06a32f1fe6272204d, type: 3}
+  - {fileID: 8072157331292172440, guid: 4327756711d3b4a06a32f1fe6272204d, type: 3}
   startTilePrefab: {fileID: 8072157331292172440, guid: 4327756711d3b4a06a32f1fe6272204d, type: 3}
   tileLength: 250
   tilesAheadCount: 6
@@ -3287,7 +3288,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 2049051064}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1919864441}
+        m_TargetAssemblyTypeName: UIButtonHooks, Assembly-CSharp
+        m_MethodName: OnMainMenuPressed
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &2049051064
 MonoBehaviour:
   m_ObjectHideFlags: 0

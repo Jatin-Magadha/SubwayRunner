@@ -74,7 +74,7 @@ GameObject:
   - component: {fileID: 4085737981703361235}
   - component: {fileID: 1157137904619781295}
   m_Layer: 0
-  m_Name: Tile 1
+  m_Name: Tile_Tunnel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -137,6 +137,12 @@ MonoBehaviour:
     isMovingTrain: 0
     trainClearanceBuffer: 6
     weight: 0.3
+  - prefab: {fileID: 7393114975082288762, guid: 2c7ed373297bc46fc8c7de26c803b51f, type: 3}
+    lanesBlocked: 2
+    obstacleLength: 10
+    isMovingTrain: 0
+    trainClearanceBuffer: 6
+    weight: 0.1
   tileLength: 250
   zonesPerTile: 8
   tilePadding: 10
@@ -164,10 +170,10 @@ MonoBehaviour:
   zonesPerTile: 6
   tilePadding: 10
   coinsPerRow: 8
-  spacing: 2.5
+  spacing: 1.5
   coinHeight: 0.5
-  arcPeakHeight: 5
-  rampMaxHeight: 3
+  arcPeakHeight: 2.5
+  rampMaxHeight: 2
   laneDistance: 4.5
   zoneSpawnChance: 0.75
   patternWeights: []
