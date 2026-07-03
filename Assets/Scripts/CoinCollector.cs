@@ -12,6 +12,11 @@ public class CoinCollector : MonoBehaviour
 
     private static AudioSource sfxSource;
 
+    void Update()
+    {
+        transform.Rotate(0, 250 * Time.deltaTime, 0f);
+    }
+
     /// <summary>
     /// Static entry point called from PlayerController.OnTriggerEnter.
     /// </summary>

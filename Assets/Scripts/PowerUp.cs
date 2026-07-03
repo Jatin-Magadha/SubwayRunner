@@ -46,7 +46,7 @@ public class PowerUp : MonoBehaviour
                 if (col.CompareTag("Coin"))
                 {
                     col.transform.position = Vector3.MoveTowards(
-                        col.transform.position, player.transform.position, Time.deltaTime * 15f);
+                        col.transform.position, player.transform.position, Time.deltaTime * 50f);
                 }
             }
             timer -= Time.deltaTime;

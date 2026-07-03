@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 3129158920075551052}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 4.5, y: 0, z: 0}
+  m_LocalPosition: {x: 4.75, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -137,6 +137,48 @@ MonoBehaviour:
     isMovingTrain: 0
     trainClearanceBuffer: 6
     weight: 0.3
+  - prefab: {fileID: 564436387079368534, guid: ed57b89c679fa46eaabc8900a6119bd7, type: 3}
+    lanesBlocked: 1
+    obstacleLength: 4
+    isMovingTrain: 0
+    trainClearanceBuffer: 6
+    weight: 0.3
+  - prefab: {fileID: 2773037729746912800, guid: dfc90edda7be74312be1f3c048293036, type: 3}
+    lanesBlocked: 1
+    obstacleLength: 6
+    isMovingTrain: 1
+    trainClearanceBuffer: 6
+    weight: 0.2
+  - prefab: {fileID: 2773037729746912800, guid: 11b1f67d5f78a46508b909bbbef4cbfe, type: 3}
+    lanesBlocked: 1
+    obstacleLength: 8
+    isMovingTrain: 1
+    trainClearanceBuffer: 6
+    weight: 0.2
+  - prefab: {fileID: 2773037729746912800, guid: 264a9eb432f964a0d8a033ebd58f8241, type: 3}
+    lanesBlocked: 1
+    obstacleLength: 2
+    isMovingTrain: 0
+    trainClearanceBuffer: 6
+    weight: 0.1
+  - prefab: {fileID: 8553841200167137664, guid: bbb61b664301b4425b097977e320b6a2, type: 3}
+    lanesBlocked: 1
+    obstacleLength: 1
+    isMovingTrain: 0
+    trainClearanceBuffer: 6
+    weight: 0.1
+  - prefab: {fileID: 3253513192005644032, guid: 63b6d36d966e54d89a3cdb16833b3d03, type: 3}
+    lanesBlocked: 1
+    obstacleLength: 1
+    isMovingTrain: 0
+    trainClearanceBuffer: 6
+    weight: 0.1
+  - prefab: {fileID: 752309193907174613, guid: de22930c62a3242c69049d629ae3dc58, type: 3}
+    lanesBlocked: 1
+    obstacleLength: 1
+    isMovingTrain: 0
+    trainClearanceBuffer: 6
+    weight: 0.1
   tileLength: 250
   zonesPerTile: 8
   tilePadding: 10
@@ -164,10 +206,10 @@ MonoBehaviour:
   zonesPerTile: 6
   tilePadding: 10
   coinsPerRow: 8
-  spacing: 2.5
-  coinHeight: 0.5
-  arcPeakHeight: 5
-  rampMaxHeight: 3
+  spacing: 5
+  coinHeight: 1
+  arcPeakHeight: 4.5
+  rampMaxHeight: 0
   laneDistance: 4.5
   zoneSpawnChance: 0.75
   patternWeights: []

@@ -1,77 +1,129 @@
 using UnityEngine;
 
 /// <summary>
-/// Handles 3-lane runner movement: left/right lane switching, jump, slide,
-/// gravity, and collision detection with obstacles/coins/trains.
+/// 3-lane endless runner controller.
 ///
-/// Cancel moves (matching the original game feel):
-///   Jump → Slide: swipe/press down while airborne → slams player to ground fast,
-///                 then auto-enters slide the moment they land.
-///   Slide → Jump: swipe/press up while sliding → instantly cancels slide,
-///                 restores collider, and fires a full jump.
+/// SIDE-CLIP LANE BOUNCE:
+///   When a FullBlock/Train side-clip results in a stumble, the player is
+///   immediately bounced back to their previous lane and that destination lane
+///   is locked for the duration of the stumble — preventing clipping through.
+///
+/// STUMBLE RULES:
+///   • Stumble 1: survive, bounce back to safe lane, lock destination lane
+///   • Stumble 2 within stumbleWindowDuration: Fatal
+///   • isStumbling / grace period: collisions ignored
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
+    // ════════════════════════════════════════════════════════════════════════
+    //  INSPECTOR
+    // ════════════════════════════════════════════════════════════════════════
+
     [Header("Lane Settings")]
     public float laneDistance    = 2.5f;
     public float laneChangeSpeed = 12f;
-    private int currentLane = 0;   // -1 left | 0 center | 1 right
 
     [Header("Jump / Slide")]
     public float jumpForce           = 9f;
     public float gravity             = -25f;
     public float slideDuration       = 0.6f;
-
-    [Tooltip("Extra downward force added when the player cancels a jump into a slide mid-air." +
-             " Higher = hits the ground faster.")]
     public float jumpCancelSlamForce = 22f;
 
-    [Header("Animation (optional)")]
+    [Header("Stumble Settings")]
+    public float stumbleDuration        = 0.9f;
+    public float stumbleWindowDuration  = 3f;
+    public float stumbleGracePeriod     = 0.4f;
+    [Range(0.1f, 1f)]
+    public float stumbleSpeedMultiplier = 0.6f;
+    public float stumbleShakeMagnitude  = 0.15f;
+
+    [Tooltip("How quickly the player snaps back to the safe lane after a side-clip stumble.")]
+    public float laneBouncebackSpeed = 20f;
+
+    [Header("Side-Clip Detection")]
+    public float laneChangeDetectThreshold = 0.3f;
+
+    [Header("Animation")]
     public Animator animator;
 
-    // ── Components ──────────────────────────────────────────────────────────
+    [Header("Swipe Input")]
+    public float minSwipeDistance = 50f;
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  PRIVATE STATE
+    // ════════════════════════════════════════════════════════════════════════
+
     private CharacterController controller;
     private Vector3 velocity;
-    private bool isGrounded;
-    private bool wasGrounded;          // track landing frame
 
-    // ── Slide state ─────────────────────────────────────────────────────────
+    // Grounded
+    private bool isGrounded;
+    private bool wasGrounded;
+
+    // Lane
+    private int   currentLane  = 0;    // destination lane (-1 | 0 | 1)
+    private int   previousLane = 0;    // lane before the most recent switch
+    private float targetLaneX;         // world X we're moving toward
+    private int   blockedLane  = -99;  // lane locked after a side-clip stumble
+
+    // Slide
     private bool  isSliding;
     private float slideTimer;
 
-    // ── Jump-cancel-into-slide ───────────────────────────────────────────────
-    // Player pressed Down while airborne: slam them to ground, then auto-slide.
+    // Jump-cancel slam
     private bool isSlamming;
     private bool pendingSlideOnLand;
 
-    // ── Collider cache ───────────────────────────────────────────────────────
+    // Stumble
+    private bool  isStumbling;
+    private float stumbleTimer;
+    private float stumbleGraceTimer;
+    private int   stumbleCount;
+    private float stumbleWindowTimer;
+
+    // Invincibility (power-up)
+    public  bool  IsInvincible  { get; private set; }
+    private float invincibleTimer;
+
+    // Collider cache
     private Vector3 originalCenter;
     private float   originalHeight;
 
-    // ── Swipe input ─────────────────────────────────────────────────────────
-    [Header("Swipe Input")]
-    public float minSwipeDistance = 50f;
+    // Touch
     private Vector2 touchStartPos;
     private bool    trackingTouch;
 
-    // ────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════
+    //  INIT / RESET
+    // ════════════════════════════════════════════════════════════════════════
 
     private void Awake()
     {
         controller     = GetComponent<CharacterController>();
         originalCenter = controller.center;
         originalHeight = controller.height;
+        targetLaneX    = 0f;
     }
 
     public void ResetPlayer()
     {
         currentLane        = 0;
+        previousLane       = 0;
+        targetLaneX        = 0f;
+        blockedLane        = -99;
         velocity           = Vector3.zero;
         isSliding          = false;
         isSlamming         = false;
         pendingSlideOnLand = false;
         slideTimer         = 0f;
+        isStumbling        = false;
+        stumbleTimer       = 0f;
+        stumbleGraceTimer  = 0f;
+        stumbleCount       = 0;
+        stumbleWindowTimer = 0f;
+        IsInvincible       = false;
+        invincibleTimer    = 0f;
         RestoreCollider();
         transform.position = new Vector3(0f, transform.position.y, transform.position.z);
         if (animator) animator.Rebind();
@@ -88,30 +140,41 @@ public class PlayerController : MonoBehaviour
         wasGrounded = isGrounded;
         isGrounded  = controller.isGrounded;
 
+        TickTimers();
         DetectLanding();
-        HandleInput();
+
+        if (!isStumbling) HandleFullInput();
+        else              HandleLaneInputOnly();
+
         HandleSlideTimer();
         ApplyMovement();
+        UpdateAnimator();
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    //  LANDING DETECTION
-    //  Runs before input so pendingSlideOnLand is consumed this same frame.
-    // ────────────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════
+    //  TIMERS
+    // ════════════════════════════════════════════════════════════════════════
 
-    private void DetectLanding()
+    private void TickTimers()
     {
-        bool justLanded = isGrounded && !wasGrounded;
-
-        if (justLanded)
+        if (isStumbling)
         {
-            isSlamming = false;
+            stumbleTimer -= Time.deltaTime;
+            if (stumbleTimer <= 0f) EndStumble();
+        }
 
-            if (pendingSlideOnLand)
-            {
-                pendingSlideOnLand = false;
-                BeginSlide();          // auto-slide on landing after slam
-            }
+        if (stumbleGraceTimer > 0f) stumbleGraceTimer -= Time.deltaTime;
+
+        if (stumbleWindowTimer > 0f)
+        {
+            stumbleWindowTimer -= Time.deltaTime;
+            if (stumbleWindowTimer <= 0f) stumbleCount = 0;
+        }
+
+        if (IsInvincible)
+        {
+            invincibleTimer -= Time.deltaTime;
+            if (invincibleTimer <= 0f) IsInvincible = false;
         }
     }
 
@@ -119,78 +182,76 @@ public class PlayerController : MonoBehaviour
     //  INPUT
     // ════════════════════════════════════════════════════════════════════════
 
-    private void HandleInput()
+    private void HandleFullInput()
     {
-        // ── Keyboard (editor / desktop) ──────────────────────────────────────
-        if (Input.GetKeyDown(KeyCode.LeftArrow))  ChangeLane(-1);
-        if (Input.GetKeyDown(KeyCode.RightArrow)) ChangeLane(1);
+        if (Input.GetKeyDown(KeyCode.LeftArrow))  TryChangeLane(-1);
+        if (Input.GetKeyDown(KeyCode.RightArrow)) TryChangeLane(1);
         if (Input.GetKeyDown(KeyCode.UpArrow))    OnUpInput();
         if (Input.GetKeyDown(KeyCode.DownArrow))  OnDownInput();
+        ReadSwipe(fullInput: true);
+    }
 
-        // ── Touch / swipe ────────────────────────────────────────────────────
-        if (Input.touchCount > 0)
+    private void HandleLaneInputOnly()
+    {
+        if (Input.GetKeyDown(KeyCode.LeftArrow))  TryChangeLane(-1);
+        if (Input.GetKeyDown(KeyCode.RightArrow)) TryChangeLane(1);
+        ReadSwipe(fullInput: false);
+    }
+
+    private void ReadSwipe(bool fullInput)
+    {
+        if (Input.touchCount == 0) return;
+        Touch touch = Input.GetTouch(0);
+        if (touch.phase == TouchPhase.Began)
         {
-            Touch touch = Input.GetTouch(0);
+            touchStartPos = touch.position;
+            trackingTouch = true;
+        }
+        else if (touch.phase == TouchPhase.Ended && trackingTouch)
+        {
+            trackingTouch = false;
+            Vector2 delta = touch.position - touchStartPos;
+            if (delta.magnitude < minSwipeDistance) return;
 
-            if (touch.phase == TouchPhase.Began)
+            if (Mathf.Abs(delta.x) > Mathf.Abs(delta.y))
+                TryChangeLane(delta.x > 0 ? 1 : -1);
+            else if (fullInput)
             {
-                touchStartPos = touch.position;
-                trackingTouch = true;
-            }
-            else if (touch.phase == TouchPhase.Ended && trackingTouch)
-            {
-                trackingTouch = false;
-                Vector2 delta = touch.position - touchStartPos;
-
-                if (delta.magnitude < minSwipeDistance) return;
-
-                if (Mathf.Abs(delta.x) > Mathf.Abs(delta.y))
-                    ChangeLane(delta.x > 0 ? 1 : -1);
-                else if (delta.y > 0)
-                    OnUpInput();
-                else
-                    OnDownInput();
+                if (delta.y > 0) OnUpInput();
+                else             OnDownInput();
             }
         }
     }
 
-    // ── Unified directional handlers ─────────────────────────────────────────
+    /// <summary>
+    /// Attempts a lane change. Rejects if the destination lane is currently
+    /// blocked due to a recent side-clip stumble.
+    /// </summary>
+    private void TryChangeLane(int dir)
+    {
+        int destination = Mathf.Clamp(currentLane + dir, -1, 1);
+        if (destination == currentLane) return;       // already at edge
+        if (destination == blockedLane) return;       // lane is locked after side-clip
 
-    /// Up input:
-    ///   • Grounded + not sliding → normal jump
-    ///   • Sliding → CANCEL slide immediately, then jump  (Slide → Jump cancel)
-    ///   • Airborne (and not already slamming) → ignored (no double-jump)
+        previousLane = currentLane;
+        currentLane  = destination;
+        targetLaneX  = currentLane * laneDistance;
+    }
+
     private void OnUpInput()
     {
-        if (isSliding)
-        {
-            // ── Slide → Jump cancel ───────────────────────────────────────────
-            CancelSlide();
-            ForceJump();
-        }
-        else if (isGrounded)
-        {
-            ForceJump();
-        }
-        // airborne + not sliding: ignore (extend to double-jump here if desired)
+        if (isSliding) { CancelSlide(); ForceJump(); }
+        else if (isGrounded) ForceJump();
     }
 
-    /// Down input:
-    ///   • Grounded + not sliding → normal slide
-    ///   • Airborne (not slamming) → CANCEL jump, slam down  (Jump → Slide cancel)
-    ///   • Already slamming → ignore (already committed)
-    ///   • Already sliding  → ignore
     private void OnDownInput()
     {
         if (!isGrounded && !isSlamming)
         {
-            // ── Jump → Slide cancel ───────────────────────────────────────────
-            // Spike velocity downward and queue a slide for when we land.
-            velocity.y        = -jumpCancelSlamForce;
-            isSlamming        = true;
+            velocity.y         = -jumpCancelSlamForce;
+            isSlamming         = true;
             pendingSlideOnLand = true;
-
-            if (animator) animator.SetTrigger("Slam"); // optional "tuck" animation
+            if (animator) animator.SetTrigger("Slam");
         }
         else if (isGrounded && !isSliding)
         {
@@ -198,14 +259,16 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void ChangeLane(int direction)
-    {
-        currentLane = Mathf.Clamp(currentLane + direction, -1, 1);
-    }
+    // ════════════════════════════════════════════════════════════════════════
+    //  JUMP & SLIDE
+    // ════════════════════════════════════════════════════════════════════════
 
-    // ════════════════════════════════════════════════════════════════════════
-    //  JUMP & SLIDE INTERNALS
-    // ════════════════════════════════════════════════════════════════════════
+    private void DetectLanding()
+    {
+        if (!isGrounded || wasGrounded) return;
+        isSlamming = false;
+        if (pendingSlideOnLand) { pendingSlideOnLand = false; BeginSlide(); }
+    }
 
     private void ForceJump()
     {
@@ -218,29 +281,18 @@ public class PlayerController : MonoBehaviour
     {
         isSliding  = true;
         slideTimer = slideDuration;
-
-        // Shrink collider so the player can pass under low obstacles
-        float slideHeight    = originalHeight * 0.5f;
-
-        // Keep the BOTTOM of the collider pinned at its original floor position.
-        // CharacterController bottom = center.y - height/2
-        // So: newCenter.y = originalBottom + newHeight/2
-        float originalBottom = originalCenter.y - originalHeight * 0.5f;
-        float slideCenterY   = originalBottom + slideHeight * 0.5f;
-
-        controller.height = slideHeight;
-        controller.center = new Vector3(originalCenter.x, slideCenterY, originalCenter.z);
-
+        float newH   = originalHeight * 0.5f;
+        float bottom = originalCenter.y - originalHeight * 0.5f;
+        controller.height = newH;
+        controller.center = new Vector3(originalCenter.x, bottom + newH * 0.5f, originalCenter.z);
         if (animator) animator.SetTrigger("Slide");
     }
 
-    /// Instantly end an active slide — used by the Slide → Jump cancel.
     private void CancelSlide()
     {
         isSliding  = false;
         slideTimer = 0f;
         RestoreCollider();
-        // No "EndSlide" trigger needed; Jump trigger will override the anim.
     }
 
     private void HandleSlideTimer()
@@ -262,67 +314,157 @@ public class PlayerController : MonoBehaviour
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  MOVEMENT (all axes in one Move call)
+    //  COLLISION CONTEXT
+    // ════════════════════════════════════════════════════════════════════════
+
+    private CollisionContext BuildCollisionContext()
+    {
+        float offsetFromTarget = Mathf.Abs(transform.position.x - targetLaneX);
+        return new CollisionContext
+        {
+            isJumping           = !isGrounded,
+            isSliding           = isSliding,
+            verticalVelocity    = velocity.y,
+            slideTimeRemaining  = slideTimer,
+            slideDuration       = slideDuration,
+            isChangingLane      = offsetFromTarget > laneChangeDetectThreshold,
+            laneOffsetMagnitude = offsetFromTarget
+        };
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  STUMBLE SYSTEM
+    // ════════════════════════════════════════════════════════════════════════
+
+    public void HandleObstacleCollision(ObstacleHit obstacle)
+    {
+        if (IsInvincible) return;
+        if (isStumbling || stumbleGraceTimer > 0f) return;
+
+        CollisionContext ctx = BuildCollisionContext();
+        var result = obstacle.GetCollisionResult(ctx);
+
+        switch (result)
+        {
+            case ObstacleHit.CollisionResult.Avoided: return;
+            case ObstacleHit.CollisionResult.Stumble: TryStumble(isSideClip: ctx.isChangingLane); break;
+            case ObstacleHit.CollisionResult.Fatal:   TriggerDeath(); break;
+        }
+    }
+
+    private void TryStumble(bool isSideClip)
+    {
+        stumbleCount++;
+
+        if (stumbleCount >= 2 && stumbleWindowTimer > 0f)
+        {
+            TriggerDeath();
+            return;
+        }
+
+        stumbleWindowTimer = stumbleWindowDuration;
+        BeginStumble(isSideClip);
+    }
+
+    private void BeginStumble(bool isSideClip)
+    {
+        isStumbling  = true;
+        stumbleTimer = stumbleDuration;
+
+        if (isSliding) CancelSlide();
+
+        // ── Side-clip: bounce back and lock the blocked lane ─────────────────
+        if (isSideClip)
+        {
+            blockedLane  = currentLane;       // lock the lane they were entering
+            currentLane  = previousLane;      // snap back to where they came from
+            targetLaneX  = currentLane * laneDistance;
+        }
+
+        if (animator) animator.SetTrigger("Stumble");
+
+        CameraShake shake = Camera.main?.GetComponent<CameraShake>();
+        shake?.Shake(stumbleShakeMagnitude, stumbleDuration * 0.5f);
+
+        // Notify the chaser that player stumbled (chaser gains ground)
+        ChaserController chaser = FindObjectOfType<ChaserController>();
+        chaser?.OnPlayerStumbled();
+    }
+
+    private void EndStumble()
+    {
+        isStumbling       = false;
+        stumbleTimer      = 0f;
+        stumbleGraceTimer = stumbleGracePeriod;
+        blockedLane       = -99;   // unlock the lane once stumble animation finishes
+        if (animator) animator.SetTrigger("RecoverFromStumble");
+    }
+
+    private void TriggerDeath()
+    {
+        if (GameManager.Instance.CurrentState != GameManager.GameState.Playing) return;
+        if (animator) animator.SetTrigger("Death");
+        GameManager.Instance.TriggerGameOver();
+    }
+
+    public void SetInvincible(float duration)
+    {
+        IsInvincible    = true;
+        invincibleTimer = duration;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  MOVEMENT
     // ════════════════════════════════════════════════════════════════════════
 
     private void ApplyMovement()
     {
-        // 1. Lane (X) ─ lerp toward target lane
-        float targetX = currentLane * laneDistance;
-        float deltaX  = Mathf.MoveTowards(transform.position.x, targetX,
-                            Time.deltaTime * laneChangeSpeed * laneDistance)
-                        - transform.position.x;
+        // X — move toward target lane; use faster bounceback speed while stumbling
+        float xSpeed = isStumbling ? laneBouncebackSpeed : laneChangeSpeed * laneDistance;
+        float newX   = Mathf.MoveTowards(transform.position.x, targetLaneX,
+                            Time.deltaTime * xSpeed);
+        float deltaX = newX - transform.position.x;
 
-        // 2. Vertical (Y) ─ gravity always applies; slam amplifies it
-        if (isGrounded && velocity.y < 0)
-            velocity.y = -2f;                         // keep grounded flag stable
-
+        // Y — gravity
+        if (isGrounded && velocity.y < 0f) velocity.y = -2f;
         velocity.y += gravity * Time.deltaTime;
 
-        // 3. Forward (Z)
-        float forwardSpeed = GameManager.Instance.CurrentSpeed;
+        // Z — forward, slowed during stumble
+        float speed = GameManager.Instance.CurrentSpeed;
+        if (isStumbling) speed *= stumbleSpeedMultiplier;
 
-        controller.Move(new Vector3(deltaX,
-                                    velocity.y * Time.deltaTime,
-                                    forwardSpeed * Time.deltaTime));
+        controller.Move(new Vector3(deltaX, velocity.y * Time.deltaTime, speed * Time.deltaTime));
+    }
 
-        if (animator)
-        {
-            animator.SetBool("IsGrounded", isGrounded);
-            animator.SetBool("IsSliding",  isSliding);
-            animator.SetBool("IsSlamming", isSlamming);
-        }
+    private void UpdateAnimator()
+    {
+        if (!animator) return;
+        animator.SetBool("IsGrounded",   isGrounded);
+        animator.SetBool("IsSliding",    isSliding);
+        animator.SetBool("IsSlamming",   isSlamming);
+        animator.SetBool("IsStumbling",  isStumbling);
+        animator.SetBool("IsInvincible", IsInvincible);
+        animator.SetInteger("StumbleCount", stumbleCount);
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  COLLISIONS
+    //  TRIGGERS
     // ════════════════════════════════════════════════════════════════════════
 
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Coin"))
-        {
             CoinCollector.HandleCoinCollected(other.gameObject);
-        }
         else if (other.CompareTag("Obstacle"))
         {
-            ObstacleHit obstacle = other.GetComponent<ObstacleHit>();
-            if (obstacle != null && obstacle.CanBeAvoided(isSliding, !isGrounded))
-                return; // successfully avoided
-
-            HandleDeath();
+            ObstacleHit obs = other.GetComponent<ObstacleHit>();
+            if (obs != null) HandleObstacleCollision(obs);
+            else             TriggerDeath();
         }
         else if (other.CompareTag("PowerUp"))
         {
-            PowerUp powerUp = other.GetComponent<PowerUp>();
-            powerUp?.Activate(this);
+            other.GetComponent<PowerUp>()?.Activate(this);
             other.gameObject.SetActive(false);
         }
-    }
-
-    private void HandleDeath()
-    {
-        if (animator) animator.SetTrigger("Death");
-        GameManager.Instance.TriggerGameOver();
     }
 }

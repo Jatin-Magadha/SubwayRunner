@@ -85,6 +85,10 @@ PrefabInstance:
       value: Stroper
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 583d2ac83027b4a4889239263b9a4cf9, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 583d2ac83027b4a4889239263b9a4cf9, type: 3}
       propertyPath: m_TagString
       value: Obstacle
       objectReference: {fileID: 0}
@@ -137,7 +141,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fc84a82edb8554824b51f3b741f5c1a8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  type: 2
+  type: 1
+  jumpClearVelocityThreshold: 4
+  slideProperlyElapsedRatio: 0.25
+  sideClipLaneOffsetThreshold: 0.6
+  severityOverride: 0
 --- !u!4 &685333149151401434 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 583d2ac83027b4a4889239263b9a4cf9, type: 3}
