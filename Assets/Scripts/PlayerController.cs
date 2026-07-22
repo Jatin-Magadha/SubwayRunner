@@ -12,6 +12,11 @@ using UnityEngine;
 ///   • Stumble 1: survive, bounce back to safe lane, lock destination lane
 ///   • Stumble 2 within stumbleWindowDuration: Fatal
 ///   • isStumbling / grace period: collisions ignored
+///
+/// LANE-CHANGE HOP:
+///   Changing lanes now applies a small vertical hop (when grounded and not
+///   sliding/slamming) so the movement reads as a little jump-step, and fires
+///   the "LaneChange" animation trigger.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
@@ -23,6 +28,8 @@ public class PlayerController : MonoBehaviour
     [Header("Lane Settings")]
     public float laneDistance    = 2.5f;
     public float laneChangeSpeed = 12f;
+    [Tooltip("Small vertical hop applied when changing lanes (grounded only).")]
+    public float laneChangeHopForce = 4f;
 
     [Header("Jump / Slide")]
     public float jumpForce           = 9f;
@@ -49,6 +56,10 @@ public class PlayerController : MonoBehaviour
 
     [Header("Swipe Input")]
     public float minSwipeDistance = 50f;
+
+    [Header("Hoverboard")]
+    [Tooltip("Auto-found on this GameObject if left empty.")]
+    public HoverboardController hoverboard;
 
     // ════════════════════════════════════════════════════════════════════════
     //  PRIVATE STATE
@@ -94,6 +105,10 @@ public class PlayerController : MonoBehaviour
     private Vector2 touchStartPos;
     private bool    trackingTouch;
 
+    // Double-tap to activate hoverboard
+    private float lastTapTime          = -99f;
+    private const float DoubleTapWindow = 0.3f;
+
     // ════════════════════════════════════════════════════════════════════════
     //  INIT / RESET
     // ════════════════════════════════════════════════════════════════════════
@@ -104,6 +119,9 @@ public class PlayerController : MonoBehaviour
         originalCenter = controller.center;
         originalHeight = controller.height;
         targetLaneX    = 0f;
+
+        if (hoverboard == null)
+            hoverboard = GetComponent<HoverboardController>();
     }
 
     public void ResetPlayer()
@@ -118,15 +136,17 @@ public class PlayerController : MonoBehaviour
         pendingSlideOnLand = false;
         slideTimer         = 0f;
         isStumbling        = false;
-        stumbleTimer       = 0f;
+        stumbleTimer        = 0f;
         stumbleGraceTimer  = 0f;
-        stumbleCount       = 0;
+        stumbleCount        = 0;
         stumbleWindowTimer = 0f;
-        IsInvincible       = false;
-        invincibleTimer    = 0f;
+        IsInvincible        = false;
+        invincibleTimer     = 0f;
+        lastTapTime          = -99f;
         RestoreCollider();
         transform.position = new Vector3(0f, transform.position.y, transform.position.z);
         if (animator) animator.Rebind();
+        hoverboard?.ResetBoard();
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -188,6 +208,7 @@ public class PlayerController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.RightArrow)) TryChangeLane(1);
         if (Input.GetKeyDown(KeyCode.UpArrow))    OnUpInput();
         if (Input.GetKeyDown(KeyCode.DownArrow))  OnDownInput();
+        if (Input.GetKeyDown(KeyCode.Space))      hoverboard?.TryActivateBoard();
         ReadSwipe(fullInput: true);
     }
 
@@ -225,7 +246,9 @@ public class PlayerController : MonoBehaviour
 
     /// <summary>
     /// Attempts a lane change. Rejects if the destination lane is currently
-    /// blocked due to a recent side-clip stumble.
+    /// blocked due to a recent side-clip stumble. On success, applies a small
+    /// vertical hop (if grounded and not sliding/slamming) and fires the
+    /// LaneChange animation trigger.
     /// </summary>
     private void TryChangeLane(int dir)
     {
@@ -236,6 +259,16 @@ public class PlayerController : MonoBehaviour
         previousLane = currentLane;
         currentLane  = destination;
         targetLaneX  = currentLane * laneDistance;
+
+        // Small hop while changing lanes, only if grounded and not sliding/slamming.
+        // Reuses the existing gravity/landing pipeline — no new state required.
+        if (isGrounded && !isSliding && !isSlamming)
+        {
+            velocity.y = laneChangeHopForce;
+            isGrounded = false;
+        }
+
+        if (animator) animator.SetTrigger("LaneChange");
     }
 
     private void OnUpInput()
@@ -403,6 +436,11 @@ public class PlayerController : MonoBehaviour
     private void TriggerDeath()
     {
         if (GameManager.Instance.CurrentState != GameManager.GameState.Playing) return;
+
+        // Give the hoverboard a chance to absorb the hit first
+        if (hoverboard != null && hoverboard.TryAbsorbFatalHit())
+            return;   // board absorbed it — player survives
+
         if (animator) animator.SetTrigger("Death");
         GameManager.Instance.TriggerGameOver();
     }
@@ -464,6 +502,11 @@ public class PlayerController : MonoBehaviour
         else if (other.CompareTag("PowerUp"))
         {
             other.GetComponent<PowerUp>()?.Activate(this);
+            other.gameObject.SetActive(false);
+        }
+        else if (other.CompareTag("Hoverboard"))
+        {
+            hoverboard?.CollectBoard(1);
             other.gameObject.SetActive(false);
         }
     }

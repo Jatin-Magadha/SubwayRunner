@@ -12,25 +12,30 @@ public class GameManager : MonoBehaviour
     public PlayerController player;
     public TileSpawner      tileSpawner;
     public ScoreManager     scoreManager;
-    public ChaserController chaser;
+    public ChaserController chaser;        // drag chaser GameObject here
 
     [Header("UI")]
     public GameObject mainMenuPanel;
     public GameObject gameplayHUD;
     public GameObject gameOverPanel;
 
-    [Header("Game Settings")]
+    [Header("Speed Settings")]
     public float baseSpeed              = 8f;
     public float speedIncreasePerSecond = 0.15f;
     public float maxSpeed               = 28f;
 
-    [Tooltip("Seconds after game start before the chaser becomes active. " +
-             "Gives player time to get comfortable before pressure begins.")]
-    public float chaserActivationDelay = 4f;
+    [Header("Chaser Delay")]
+    [Tooltip("Seconds from run start before chaser begins moving. " +
+             "Gives the player a head start each run.")]
+    public float chaserActivationDelay  = 4f;
 
     public float CurrentSpeed { get; private set; }
+
     private float gameTime;
     private float chaserActivationTimer;
+    private bool  chaserActivated;
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void Awake()
     {
@@ -44,17 +49,24 @@ public class GameManager : MonoBehaviour
     {
         if (CurrentState != GameState.Playing) return;
 
-        gameTime += Time.deltaTime;
-        CurrentSpeed = Mathf.Min(baseSpeed + gameTime * speedIncreasePerSecond, maxSpeed);
+        gameTime     += Time.deltaTime;
+        CurrentSpeed  = Mathf.Min(baseSpeed + gameTime * speedIncreasePerSecond, maxSpeed);
 
-        // Activate the chaser after the delay
-        if (chaser != null && !chaser.enabled)
+        // ── Chaser activation countdown ──────────────────────────────────────
+        // FIX: previously checked !chaser.enabled (Unity built-in, always true)
+        //      instead of our IsActive flag — timer never actually fired.
+        if (chaser != null && !chaserActivated)
         {
             chaserActivationTimer -= Time.deltaTime;
             if (chaserActivationTimer <= 0f)
+            {
+                chaserActivated = true;
                 chaser.ActivateChaser();
+            }
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     public void ShowMainMenu()
     {
@@ -67,9 +79,10 @@ public class GameManager : MonoBehaviour
 
     public void StartGame()
     {
-        CurrentState  = GameState.Playing;
-        gameTime      = 0f;
-        CurrentSpeed  = baseSpeed;
+        CurrentState          = GameState.Playing;
+        gameTime              = 0f;
+        CurrentSpeed          = baseSpeed;
+        chaserActivated       = false;
         chaserActivationTimer = chaserActivationDelay;
 
         if (mainMenuPanel) mainMenuPanel.SetActive(false);
@@ -80,6 +93,7 @@ public class GameManager : MonoBehaviour
         tileSpawner.ResetSpawner();
         player.ResetPlayer();
 
+        // Reset chaser AFTER player.ResetPlayer() so the player position is correct
         if (chaser != null) chaser.ResetChaser();
 
         Time.timeScale = 1f;
@@ -93,11 +107,10 @@ public class GameManager : MonoBehaviour
         scoreManager.FinalizeRun();
 
         if (chaser != null) chaser.DeactivateChaser();
+        if (gameplayHUD)    gameplayHUD.SetActive(false);
+        if (gameOverPanel)  gameOverPanel.SetActive(true);
 
-        if (gameplayHUD)   gameplayHUD.SetActive(false);
-        if (gameOverPanel) gameOverPanel.SetActive(true);
-
-        Invoke(nameof(StopGameTime), 2.0f);
+        Invoke(nameof(StopGameTime), 1.0f);
     }
 
     private void StopGameTime()
@@ -114,6 +127,7 @@ public class GameManager : MonoBehaviour
     public void QuitToMenu()
     {
         Time.timeScale = 1f;
+        if (chaser != null) chaser.DeactivateChaser();
         ShowMainMenu();
     }
 }

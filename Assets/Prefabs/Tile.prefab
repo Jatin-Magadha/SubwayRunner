@@ -95,12 +95,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   coinPrefab: {fileID: 983602108027713767, guid: 95a71797b1f3746d39d614767b162509, type: 3}
+  tileLength: 30
+  zonesPerTile: 3
+  tilePadding: 2
   coinsPerRow: 8
   spacing: 1.5
   coinHeight: 0.5
+  arcPeakHeight: 2.5
+  rampMaxHeight: 2
   laneDistance: 4.5
-  autoSpawnOnStart: 1
-  autoSpawnLane: -99
+  zoneSpawnChance: 0.75
+  patternWeights: []
 --- !u!1 &9031161299794364955
 GameObject:
   m_ObjectHideFlags: 0
