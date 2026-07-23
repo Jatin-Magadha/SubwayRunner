@@ -186,7 +186,7 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
@@ -204,7 +204,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fc84a82edb8554824b51f3b741f5c1a8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  type: 2
+  type: 3
   jumpClearVelocityThreshold: 4
   slideProperlyElapsedRatio: 0.25
   sideClipLaneOffsetThreshold: 0.6

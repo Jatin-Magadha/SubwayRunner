@@ -3486,8 +3486,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   laneDistance: 4.75
-  laneChangeSpeed: 1
-  laneChangeHopForce: 12
+  laneChangeSpeed: 3
+  laneChangeHopForce: 6
   jumpForce: 15
   gravity: -25
   slideDuration: 1
@@ -3498,6 +3498,12 @@ MonoBehaviour:
   stumbleSpeedMultiplier: 0.6
   stumbleShakeMagnitude: 0.15
   laneBouncebackSpeed: 20
+  obstacleLayerMask:
+    serializedVersion: 2
+    m_Bits: 128
+  laneCheckDepth: 2
+  laneCheckWidth: 2
+  collisionCooldownTime: 0.25
   laneChangeDetectThreshold: 0.3
   animator: {fileID: 1433102203}
   minSwipeDistance: 50

@@ -3,20 +3,29 @@ using UnityEngine;
 /// <summary>
 /// 3-lane endless runner controller.
 ///
-/// SIDE-CLIP LANE BOUNCE:
-///   When a FullBlock/Train side-clip results in a stumble, the player is
-///   immediately bounced back to their previous lane and that destination lane
-///   is locked for the duration of the stumble — preventing clipping through.
+/// COLLISION SETUP:
+///   OBSTACLES  → regular Collider (Is Trigger: OFF), layer "Obstacle"
+///   COINS      → Collider (Is Trigger: ON), tag "Coin"
+///   POWER-UPS  → Collider (Is Trigger: ON), tag "PowerUp"
+///   HOVERBOARD → Collider (Is Trigger: ON), tag "Hoverboard"
 ///
-/// STUMBLE RULES:
-///   • Stumble 1: survive, bounce back to safe lane, lock destination lane
-///   • Stumble 2 within stumbleWindowDuration: Fatal
-///   • isStumbling / grace period: collisions ignored
+/// LANE CHANGE + COLLISION:
+///   Three-layer defence against clipping through obstacles:
+///     1. IsLaneClear() — box-cast before the switch is committed
+///     2. Continuous Update check — re-validates every frame mid-transition
+///     3. OnControllerColliderHit — last resort physical contact
 ///
-/// LANE-CHANGE HOP:
-///   Changing lanes now applies a small vertical hop (when grounded and not
-///   sliding/slamming) so the movement reads as a little jump-step, and fires
-///   the "LaneChange" animation trigger.
+///   RevertLaneChange() is the ONLY place that reverts lane state.
+///   BeginStumble() does NOT touch lane state — this avoids the
+///   double-revert that was snapping the player to wrong lanes.
+///
+///   After a revert, collisionCooldown is set immediately so the
+///   follow-up OnControllerColliderHit from the same obstacle is ignored.
+///
+/// HOP:
+///   Lane-change hop uses a separate isLaneHopping flag so it does NOT
+///   set isJumping = true in BuildCollisionContext. Without this,
+///   Barrier obstacles returned Avoided while the player hopped through them.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
@@ -28,8 +37,9 @@ public class PlayerController : MonoBehaviour
     [Header("Lane Settings")]
     public float laneDistance    = 2.5f;
     public float laneChangeSpeed = 12f;
-    [Tooltip("Small vertical hop applied when changing lanes (grounded only).")]
-    public float laneChangeHopForce = 4f;
+    [Tooltip("Small hop applied when changing lanes. Uses a separate flag so " +
+             "it does not affect obstacle collision detection.")]
+    public float laneChangeHopForce = 3f;
 
     [Header("Jump / Slide")]
     public float jumpForce           = 9f;
@@ -44,9 +54,18 @@ public class PlayerController : MonoBehaviour
     [Range(0.1f, 1f)]
     public float stumbleSpeedMultiplier = 0.6f;
     public float stumbleShakeMagnitude  = 0.15f;
+    public float laneBouncebackSpeed    = 20f;
 
-    [Tooltip("How quickly the player snaps back to the safe lane after a side-clip stumble.")]
-    public float laneBouncebackSpeed = 20f;
+    [Header("Lane Check (pre-move validation)")]
+    [Tooltip("Layer mask containing all obstacle colliders (layer 'Obstacle').")]
+    public LayerMask obstacleLayerMask;
+    [Tooltip("How far ahead (Z) to scan before allowing a lane change.")]
+    public float laneCheckDepth = 3f;
+    [Tooltip("Half-width of the lane check box.")]
+    public float laneCheckWidth = 0.8f;
+
+    [Header("Collision Debounce")]
+    public float collisionCooldownTime = 0.3f;
 
     [Header("Side-Clip Detection")]
     public float laneChangeDetectThreshold = 0.3f;
@@ -58,7 +77,6 @@ public class PlayerController : MonoBehaviour
     public float minSwipeDistance = 50f;
 
     [Header("Hoverboard")]
-    [Tooltip("Auto-found on this GameObject if left empty.")]
     public HoverboardController hoverboard;
 
     // ════════════════════════════════════════════════════════════════════════
@@ -73,18 +91,23 @@ public class PlayerController : MonoBehaviour
     private bool wasGrounded;
 
     // Lane
-    private int   currentLane  = 0;    // destination lane (-1 | 0 | 1)
-    private int   previousLane = 0;    // lane before the most recent switch
-    private float targetLaneX;         // world X we're moving toward
-    private int   blockedLane  = -99;  // lane locked after a side-clip stumble
+    private int   currentLane   = 0;    // -1 | 0 | 1
+    private int   previousLane  = 0;
+    private float targetLaneX   = 0f;
+    private int   blockedLane   = -99;
+    private bool  isChangingLane;
 
     // Slide
     private bool  isSliding;
     private float slideTimer;
 
-    // Jump-cancel slam
-    private bool isSlamming;
-    private bool pendingSlideOnLand;
+    // Jump / slam
+    private bool  isSlamming;
+    private bool  pendingSlideOnLand;
+
+    // Lane-change hop — separate from the main jump so collision context
+    // does not think the player is "jumping" during a lane change
+    private bool  isLaneHopping;
 
     // Stumble
     private bool  isStumbling;
@@ -93,8 +116,11 @@ public class PlayerController : MonoBehaviour
     private int   stumbleCount;
     private float stumbleWindowTimer;
 
-    // Invincibility (power-up)
-    public  bool  IsInvincible  { get; private set; }
+    // Collision debounce
+    private float collisionCooldown;
+
+    // Invincibility
+    public  bool  IsInvincible { get; private set; }
     private float invincibleTimer;
 
     // Collider cache
@@ -105,9 +131,8 @@ public class PlayerController : MonoBehaviour
     private Vector2 touchStartPos;
     private bool    trackingTouch;
 
-    // Double-tap to activate hoverboard
-    private float lastTapTime          = -99f;
-    private const float DoubleTapWindow = 0.3f;
+    // Cached references
+    private ChaserController chaser;
 
     // ════════════════════════════════════════════════════════════════════════
     //  INIT / RESET
@@ -118,10 +143,11 @@ public class PlayerController : MonoBehaviour
         controller     = GetComponent<CharacterController>();
         originalCenter = controller.center;
         originalHeight = controller.height;
-        targetLaneX    = 0f;
 
         if (hoverboard == null)
             hoverboard = GetComponent<HoverboardController>();
+
+        chaser = FindObjectOfType<ChaserController>();
     }
 
     public void ResetPlayer()
@@ -130,21 +156,28 @@ public class PlayerController : MonoBehaviour
         previousLane       = 0;
         targetLaneX        = 0f;
         blockedLane        = -99;
+        isChangingLane     = false;
         velocity           = Vector3.zero;
         isSliding          = false;
         isSlamming         = false;
+        isLaneHopping      = false;
         pendingSlideOnLand = false;
         slideTimer         = 0f;
         isStumbling        = false;
-        stumbleTimer        = 0f;
+        stumbleTimer       = 0f;
         stumbleGraceTimer  = 0f;
-        stumbleCount        = 0;
+        stumbleCount       = 0;
         stumbleWindowTimer = 0f;
-        IsInvincible        = false;
-        invincibleTimer     = 0f;
-        lastTapTime          = -99f;
+        collisionCooldown  = 0f;
+        IsInvincible       = false;
+        invincibleTimer    = 0f;
         RestoreCollider();
+
+        // Hard-snap position to lane centre
+        controller.enabled = false;
         transform.position = new Vector3(0f, transform.position.y, transform.position.z);
+        controller.enabled = true;
+
         if (animator) animator.Rebind();
         hoverboard?.ResetBoard();
     }
@@ -160,8 +193,20 @@ public class PlayerController : MonoBehaviour
         wasGrounded = isGrounded;
         isGrounded  = controller.isGrounded;
 
+        // Clear lane-hop once back on ground
+        if (isGrounded && isLaneHopping) isLaneHopping = false;
+
         TickTimers();
         DetectLanding();
+
+        // ── Continuous lane validity check ────────────────────────────────
+        // Every frame during a transition, re-check whether the destination
+        // lane is still clear. Moving obstacles can enter after the initial
+        // IsLaneClear passed. If blocked → snap back immediately.
+        if (isChangingLane && !IsLaneClear(currentLane))
+        {
+            RevertLaneChange();
+        }
 
         if (!isStumbling) HandleFullInput();
         else              HandleLaneInputOnly();
@@ -184,6 +229,7 @@ public class PlayerController : MonoBehaviour
         }
 
         if (stumbleGraceTimer > 0f) stumbleGraceTimer -= Time.deltaTime;
+        if (collisionCooldown > 0f) collisionCooldown -= Time.deltaTime;
 
         if (stumbleWindowTimer > 0f)
         {
@@ -244,31 +290,93 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Attempts a lane change. Rejects if the destination lane is currently
-    /// blocked due to a recent side-clip stumble. On success, applies a small
-    /// vertical hop (if grounded and not sliding/slamming) and fires the
-    /// LaneChange animation trigger.
-    /// </summary>
+    // ════════════════════════════════════════════════════════════════════════
+    //  LANE CHANGE
+    // ════════════════════════════════════════════════════════════════════════
+
     private void TryChangeLane(int dir)
     {
         int destination = Mathf.Clamp(currentLane + dir, -1, 1);
-        if (destination == currentLane) return;       // already at edge
-        if (destination == blockedLane) return;       // lane is locked after side-clip
+        if (destination == currentLane) return;
+        if (destination == blockedLane) return;
+        if (isChangingLane) return;   // already mid-transition, ignore new input
 
-        previousLane = currentLane;
-        currentLane  = destination;
-        targetLaneX  = currentLane * laneDistance;
+        if (!IsLaneClear(destination))
+        {
+            // Obstacle ahead — give stumble feedback but stay in current lane
+            if (!isStumbling && stumbleGraceTimer <= 0f && !IsInvincible)
+                TryStumble();
+            return;
+        }
 
-        // Small hop while changing lanes, only if grounded and not sliding/slamming.
-        // Reuses the existing gravity/landing pipeline — no new state required.
+        previousLane   = currentLane;
+        currentLane    = destination;
+        targetLaneX    = currentLane * laneDistance;
+        isChangingLane = true;
+
+        // Small hop — uses isLaneHopping NOT the jump system,
+        // so BuildCollisionContext.isJumping stays false
         if (isGrounded && !isSliding && !isSlamming)
         {
-            velocity.y = laneChangeHopForce;
-            isGrounded = false;
+            velocity.y    = laneChangeHopForce;
+            isLaneHopping = true;
+            isGrounded    = false;
         }
 
         if (animator) animator.SetTrigger("LaneChange");
+    }
+
+    /// <summary>
+    /// Checks whether the target lane is clear of obstacles ahead of the player.
+    /// QueryTriggerInteraction.Ignore means coins/pickups never block lane switches.
+    /// </summary>
+    private bool IsLaneClear(int targetLane)
+    {
+        float   targetX     = targetLane * laneDistance;
+        float   centerY     = transform.position.y + controller.height * 0.5f;
+        float   centerZ     = transform.position.z + laneCheckDepth * 0.5f;
+        Vector3 center      = new Vector3(targetX, centerY, centerZ);
+        Vector3 halfExtents = new Vector3(laneCheckWidth * 0.5f,
+                                          controller.height * 0.5f,
+                                          laneCheckDepth  * 0.5f);
+
+        return !Physics.CheckBox(center, halfExtents, Quaternion.identity,
+                                 obstacleLayerMask, QueryTriggerInteraction.Ignore);
+    }
+
+    /// <summary>
+    /// Immediately cancels a lane change and hard-snaps the player back to
+    /// their previous lane. This is the ONLY place that reverts lane state.
+    /// collisionCooldown is set here so the follow-up OnControllerColliderHit
+    /// from the same obstacle contact is ignored automatically.
+    /// </summary>
+    private void RevertLaneChange()
+    {
+        int   safeLane = previousLane;
+        float safeX    = safeLane * laneDistance;
+
+        // Update logical state BEFORE snap so any callbacks this frame
+        // read consistent values
+        blockedLane    = currentLane;   // prevent immediately re-entering this lane
+        currentLane    = safeLane;
+        previousLane   = safeLane;      // both point to safe lane — no stale state
+        targetLaneX    = safeX;
+        isChangingLane = false;
+        isLaneHopping  = false;
+
+        // Hard position snap — disable CC, move transform, re-enable
+        controller.enabled = false;
+        transform.position = new Vector3(safeX,
+                                         transform.position.y,
+                                         transform.position.z);
+        controller.enabled = true;
+
+        // Suppress the follow-up collision callback that fires this same frame
+        collisionCooldown = collisionCooldownTime;
+
+        // Stumble feedback
+        if (!isStumbling && stumbleGraceTimer <= 0f && !IsInvincible)
+            TryStumble();
     }
 
     private void OnUpInput()
@@ -279,7 +387,7 @@ public class PlayerController : MonoBehaviour
 
     private void OnDownInput()
     {
-        if (!isGrounded && !isSlamming)
+        if (!isGrounded && !isSlamming && !isLaneHopping)
         {
             velocity.y         = -jumpCancelSlamForce;
             isSlamming         = true;
@@ -299,14 +407,16 @@ public class PlayerController : MonoBehaviour
     private void DetectLanding()
     {
         if (!isGrounded || wasGrounded) return;
-        isSlamming = false;
+        isSlamming    = false;
+        isLaneHopping = false;
         if (pendingSlideOnLand) { pendingSlideOnLand = false; BeginSlide(); }
     }
 
     private void ForceJump()
     {
-        velocity.y = jumpForce;
-        isGrounded = false;
+        velocity.y    = jumpForce;
+        isGrounded    = false;
+        isLaneHopping = false;   // real jump overrides any hop
         if (animator) animator.SetTrigger("Jump");
     }
 
@@ -347,6 +457,51 @@ public class PlayerController : MonoBehaviour
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    //  PHYSICAL COLLISION  (obstacles, Is Trigger: OFF)
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void OnControllerColliderHit(ControllerColliderHit hit)
+    {
+        if (hit.moveDirection.y < -0.5f) return;              // ground/ceiling
+        if (!hit.gameObject.CompareTag("Obstacle")) return;
+        if (collisionCooldown > 0f) return;                   // debounce / post-revert
+
+        // Mid lane-change hit that the continuous Update check missed
+        // (e.g. obstacle entered the lane between Update ticks)
+        if (isChangingLane)
+        {
+            RevertLaneChange();   // snaps + sets cooldown + triggers stumble
+            return;
+        }
+
+        // Settled-lane collision — normal evaluation
+        collisionCooldown = collisionCooldownTime;
+        ObstacleHit obs = hit.gameObject.GetComponent<ObstacleHit>();
+        if (obs != null) HandleObstacleCollision(obs);
+        else             TriggerDeath();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  TRIGGER ENTRY  (coins / pickups, Is Trigger: ON)
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Coin"))
+            CoinCollector.HandleCoinCollected(other.gameObject);
+        else if (other.CompareTag("PowerUp"))
+        {
+            other.GetComponent<PowerUp>()?.Activate(this);
+            other.gameObject.SetActive(false);
+        }
+        else if (other.CompareTag("Hoverboard"))
+        {
+            hoverboard?.CollectBoard(1);
+            other.gameObject.SetActive(false);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     //  COLLISION CONTEXT
     // ════════════════════════════════════════════════════════════════════════
 
@@ -355,12 +510,13 @@ public class PlayerController : MonoBehaviour
         float offsetFromTarget = Mathf.Abs(transform.position.x - targetLaneX);
         return new CollisionContext
         {
-            isJumping           = !isGrounded,
+            // isJumping is TRUE only for real jump input, NOT lane-change hop
+            isJumping           = !isGrounded && !isLaneHopping,
             isSliding           = isSliding,
             verticalVelocity    = velocity.y,
             slideTimeRemaining  = slideTimer,
             slideDuration       = slideDuration,
-            isChangingLane      = offsetFromTarget > laneChangeDetectThreshold,
+            isChangingLane      = isChangingLane,
             laneOffsetMagnitude = offsetFromTarget
         };
     }
@@ -374,18 +530,17 @@ public class PlayerController : MonoBehaviour
         if (IsInvincible) return;
         if (isStumbling || stumbleGraceTimer > 0f) return;
 
-        CollisionContext ctx = BuildCollisionContext();
-        var result = obstacle.GetCollisionResult(ctx);
+        var result = obstacle.GetCollisionResult(BuildCollisionContext());
 
         switch (result)
         {
-            case ObstacleHit.CollisionResult.Avoided: return;
-            case ObstacleHit.CollisionResult.Stumble: TryStumble(isSideClip: ctx.isChangingLane); break;
-            case ObstacleHit.CollisionResult.Fatal:   TriggerDeath(); break;
+            case ObstacleHit.CollisionResult.Avoided:  break;
+            case ObstacleHit.CollisionResult.Stumble:  TryStumble(); break;
+            case ObstacleHit.CollisionResult.Fatal:    TriggerDeath(); break;
         }
     }
 
-    private void TryStumble(bool isSideClip)
+    private void TryStumble()
     {
         stumbleCount++;
 
@@ -396,31 +551,26 @@ public class PlayerController : MonoBehaviour
         }
 
         stumbleWindowTimer = stumbleWindowDuration;
-        BeginStumble(isSideClip);
+        BeginStumble();
     }
 
-    private void BeginStumble(bool isSideClip)
+    /// <summary>
+    /// Handles stumble animation, timer, and chaser notification.
+    /// Does NOT touch lane state — RevertLaneChange() is solely responsible
+    /// for reverting lanes. Separating these prevents double-revert bugs.
+    /// </summary>
+    private void BeginStumble()
     {
         isStumbling  = true;
         stumbleTimer = stumbleDuration;
 
         if (isSliding) CancelSlide();
 
-        // ── Side-clip: bounce back and lock the blocked lane ─────────────────
-        if (isSideClip)
-        {
-            blockedLane  = currentLane;       // lock the lane they were entering
-            currentLane  = previousLane;      // snap back to where they came from
-            targetLaneX  = currentLane * laneDistance;
-        }
-
         if (animator) animator.SetTrigger("Stumble");
 
-        CameraShake shake = Camera.main?.GetComponent<CameraShake>();
-        shake?.Shake(stumbleShakeMagnitude, stumbleDuration * 0.5f);
+        Camera.main?.GetComponent<CameraShake>()
+              ?.Shake(stumbleShakeMagnitude, stumbleDuration * 0.5f);
 
-        // Notify the chaser that player stumbled (chaser gains ground)
-        ChaserController chaser = FindObjectOfType<ChaserController>();
         chaser?.OnPlayerStumbled();
     }
 
@@ -429,18 +579,15 @@ public class PlayerController : MonoBehaviour
         isStumbling       = false;
         stumbleTimer      = 0f;
         stumbleGraceTimer = stumbleGracePeriod;
-        blockedLane       = -99;   // unlock the lane once stumble animation finishes
+        blockedLane       = -99;
+        isChangingLane    = false;
         if (animator) animator.SetTrigger("RecoverFromStumble");
     }
 
     private void TriggerDeath()
     {
         if (GameManager.Instance.CurrentState != GameManager.GameState.Playing) return;
-
-        // Give the hoverboard a chance to absorb the hit first
-        if (hoverboard != null && hoverboard.TryAbsorbFatalHit())
-            return;   // board absorbed it — player survives
-
+        if (hoverboard != null && hoverboard.TryAbsorbFatalHit()) return;
         if (animator) animator.SetTrigger("Death");
         GameManager.Instance.TriggerGameOver();
     }
@@ -457,17 +604,23 @@ public class PlayerController : MonoBehaviour
 
     private void ApplyMovement()
     {
-        // X — move toward target lane; use faster bounceback speed while stumbling
         float xSpeed = isStumbling ? laneBouncebackSpeed : laneChangeSpeed * laneDistance;
         float newX   = Mathf.MoveTowards(transform.position.x, targetLaneX,
-                            Time.deltaTime * xSpeed);
+                           Time.deltaTime * xSpeed);
+
+        // Settle isChangingLane when X reaches target
+        if (isChangingLane && Mathf.Abs(newX - targetLaneX) < 0.01f)
+        {
+            newX           = targetLaneX;
+            isChangingLane = false;
+            blockedLane    = -99;   // open all lanes once settled
+        }
+
         float deltaX = newX - transform.position.x;
 
-        // Y — gravity
         if (isGrounded && velocity.y < 0f) velocity.y = -2f;
         velocity.y += gravity * Time.deltaTime;
 
-        // Z — forward, slowed during stumble
         float speed = GameManager.Instance.CurrentSpeed;
         if (isStumbling) speed *= stumbleSpeedMultiplier;
 
@@ -477,37 +630,30 @@ public class PlayerController : MonoBehaviour
     private void UpdateAnimator()
     {
         if (!animator) return;
-        animator.SetBool("IsGrounded",   isGrounded);
-        animator.SetBool("IsSliding",    isSliding);
-        animator.SetBool("IsSlamming",   isSlamming);
-        animator.SetBool("IsStumbling",  isStumbling);
-        animator.SetBool("IsInvincible", IsInvincible);
+        animator.SetBool("IsGrounded",      isGrounded);
+        animator.SetBool("IsSliding",       isSliding);
+        animator.SetBool("IsSlamming",      isSlamming);
+        animator.SetBool("IsStumbling",     isStumbling);
+        animator.SetBool("IsInvincible",    IsInvincible);
+        animator.SetBool("IsLaneHopping",   isLaneHopping);
         animator.SetInteger("StumbleCount", stumbleCount);
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  TRIGGERS
+    //  GIZMOS
     // ════════════════════════════════════════════════════════════════════════
 
-    private void OnTriggerEnter(Collider other)
+    private void OnDrawGizmosSelected()
     {
-        if (other.CompareTag("Coin"))
-            CoinCollector.HandleCoinCollected(other.gameObject);
-        else if (other.CompareTag("Obstacle"))
+        if (controller == null) controller = GetComponent<CharacterController>();
+        for (int lane = -1; lane <= 1; lane++)
         {
-            ObstacleHit obs = other.GetComponent<ObstacleHit>();
-            if (obs != null) HandleObstacleCollision(obs);
-            else             TriggerDeath();
-        }
-        else if (other.CompareTag("PowerUp"))
-        {
-            other.GetComponent<PowerUp>()?.Activate(this);
-            other.gameObject.SetActive(false);
-        }
-        else if (other.CompareTag("Hoverboard"))
-        {
-            hoverboard?.CollectBoard(1);
-            other.gameObject.SetActive(false);
+            float   x    = lane * laneDistance;
+            float   y    = transform.position.y + controller.height * 0.5f;
+            float   z    = transform.position.z + laneCheckDepth * 0.5f;
+            Vector3 size = new Vector3(laneCheckWidth, controller.height, laneCheckDepth);
+            Gizmos.color = (lane == currentLane) ? Color.green : Color.yellow;
+            Gizmos.DrawWireCube(new Vector3(x, y, z), size);
         }
     }
 }
