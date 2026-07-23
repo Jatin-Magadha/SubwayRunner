@@ -3,11 +3,20 @@ using UnityEngine;
 /// <summary>
 /// 3-lane endless runner controller.
 ///
-/// COLLISION SETUP:
-///   OBSTACLES  → regular Collider (Is Trigger: OFF), layer "Obstacle"
-///   COINS      → Collider (Is Trigger: ON), tag "Coin"
-///   POWER-UPS  → Collider (Is Trigger: ON), tag "PowerUp"
-///   HOVERBOARD → Collider (Is Trigger: ON), tag "Hoverboard"
+/// COLLISION SETUP — HYBRID (important, read carefully):
+///
+///   BARRIER / LOWBAR  → Is Trigger: ON,  tag "Obstacle", layer "Obstacle"
+///     Player physically passes through them. OnTriggerEnter evaluates
+///     whether the dodge (jump / slide) was correct → Avoided / Stumble / Fatal.
+///
+///   FULLBLOCK / TRAIN → Is Trigger: OFF, tag "Obstacle", layer "Obstacle"
+///     Solid — physically stops the player. OnControllerColliderHit handles
+///     the hit. IsLaneClear (QueryTriggerInteraction.Ignore) only detects
+///     these solid obstacles, so Barrier/LowBar never block lane changes.
+///
+///   COINS      → Is Trigger: ON, tag "Coin"
+///   POWER-UPS  → Is Trigger: ON, tag "PowerUp"
+///   HOVERBOARD → Is Trigger: ON, tag "Hoverboard"
 ///
 /// LANE CHANGE + COLLISION:
 ///   Three-layer defence against clipping through obstacles:
@@ -482,13 +491,26 @@ public class PlayerController : MonoBehaviour
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  TRIGGER ENTRY  (coins / pickups, Is Trigger: ON)
+    //  TRIGGER ENTRY  (Barrier, LowBar, coins, pickups — Is Trigger: ON)
     // ════════════════════════════════════════════════════════════════════════
 
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Coin"))
             CoinCollector.HandleCoinCollected(other.gameObject);
+
+        else if (other.CompareTag("Obstacle"))
+        {
+            // Only Barrier and LowBar reach here (Is Trigger: ON).
+            // FullBlock and Train have solid colliders and are handled
+            // by OnControllerColliderHit instead.
+            if (collisionCooldown > 0f) return;
+            collisionCooldown = collisionCooldownTime;
+
+            ObstacleHit obs = other.GetComponent<ObstacleHit>();
+            if (obs != null) HandleObstacleCollision(obs);
+            else             TriggerDeath();
+        }
         else if (other.CompareTag("PowerUp"))
         {
             other.GetComponent<PowerUp>()?.Activate(this);
