@@ -71,7 +71,7 @@ public class PlayerController : MonoBehaviour
 
                 if (animator)
                 {
-                    PlayAnimation("DodgeLeft");
+                    PlayAnimation("dodgeLeft");
                 }
             }
             else if (side == SIDE.Right)
@@ -82,7 +82,7 @@ public class PlayerController : MonoBehaviour
 
                 if (animator)
                 {
-                    PlayAnimation("DodgeLeft");
+                    PlayAnimation("dodgeLeft");
                 }
             }
             else if (side != lastSide)
@@ -103,7 +103,7 @@ public class PlayerController : MonoBehaviour
 
                 if (animator)
                 {
-                    PlayAnimation("DodgeRight");
+                    PlayAnimation("dodgeRight");
                 }
             }
             else if (side == SIDE.Left)
@@ -113,7 +113,7 @@ public class PlayerController : MonoBehaviour
 
                 if (animator)
                 {
-                    PlayAnimation("DodgeRight");
+                    PlayAnimation("dodgeRight");
                 }
             }
             else if (side != lastSide)
@@ -179,9 +179,9 @@ public class PlayerController : MonoBehaviour
     {
         if (characterController.isGrounded)
         {
-            if (animator.GetCurrentAnimatorStateInfo(0).IsName("Falling"))
+            if (animator.GetCurrentAnimatorStateInfo(0).IsName("falling"))
             {
-                PlayAnimation("Landing");
+                PlayAnimation("landing");
                 inJump = false;
             }
             if (swipeUp)
@@ -189,7 +189,7 @@ public class PlayerController : MonoBehaviour
                 y = jumpPower;
                 if (animator)
                 {
-                    animator.CrossFadeInFixedTime("Jump", 0.1f);
+                    animator.CrossFadeInFixedTime("jump", 0.1f);
                     inJump = true;
                 }
             }
@@ -200,7 +200,7 @@ public class PlayerController : MonoBehaviour
             if (characterController.velocity.y < -0.1f)
                 if (animator)
                 {
-                    PlayAnimation("Falling");
+                    PlayAnimation("falling");
                 }
         }
     }
@@ -221,7 +221,7 @@ public class PlayerController : MonoBehaviour
             y -= 10.0f;
             characterController.center = new Vector3(0, colCenterY / 2.0f, 0);
             characterController.height = colHeight / 2.0f;
-            animator.CrossFadeInFixedTime("Roll", 0.1f);
+            animator.CrossFadeInFixedTime("roll", 0.1f);
             inRoll = true;
             inJump = false;
         }
