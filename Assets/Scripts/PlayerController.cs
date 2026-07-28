@@ -128,6 +128,8 @@ public class PlayerController : MonoBehaviour
 
         if (animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1)
         {
+            //animator.SetLayerWeight(1, 0);
+
             stopAllState = false;
         }
         stumbleTime = Mathf.MoveTowards(stumbleTime, stumbleTolerance, Time.deltaTime);
@@ -304,6 +306,7 @@ public class PlayerController : MonoBehaviour
             {
                 if (animator)
                 {
+                    //animator.SetLayerWeight(1, 1);
                     Stumble("stumbleCornerRight");
                 }
                 ResetCollision();
@@ -312,6 +315,7 @@ public class PlayerController : MonoBehaviour
             {
                 if (animator)
                 {
+                    //animator.SetLayerWeight(1, 1);
                     Stumble("stumbleCornerLeft");
                 }
                 ResetCollision();
@@ -331,7 +335,7 @@ public class PlayerController : MonoBehaviour
         Bounds charBounds = characterController.bounds;
         Bounds colBounds = col.bounds;
         float minX = Mathf.Max(colBounds.min.x, charBounds.min.x);
-        float maxX = Mathf.Max(colBounds.max.x, charBounds.max.x);
+        float maxX = Mathf.Min(colBounds.max.x, charBounds.max.x);
         float average = (minX + maxX) / 2.0f - colBounds.min.x;
 
         HitX hit;
@@ -356,8 +360,8 @@ public class PlayerController : MonoBehaviour
         Bounds charBounds = characterController.bounds;
         Bounds colBounds = col.bounds;
         float minY = Mathf.Max(colBounds.min.y, charBounds.min.y);
-        float maxY = Mathf.Max(colBounds.max.y, charBounds.max.y);
-        float average = ((minY + maxY) / 2.0f - colBounds.min.y) / charBounds.size.y;
+        float maxY = Mathf.Min(colBounds.max.y, charBounds.max.y);
+        float average = ((minY + maxY) / 2.0f - charBounds.min.y) / charBounds.size.y;
 
         HitY hit;
         if (average < 0.17f)
@@ -384,8 +388,8 @@ public class PlayerController : MonoBehaviour
         Bounds charBounds = characterController.bounds;
         Bounds colBounds = col.bounds;
         float minZ = Mathf.Max(colBounds.min.z, charBounds.min.z);
-        float maxZ = Mathf.Max(colBounds.max.z, charBounds.max.z);
-        float average = ((minZ + maxZ) / 2.0f - colBounds.min.z) / charBounds.size.z;
+        float maxZ = Mathf.Min(colBounds.max.z, charBounds.max.z);
+        float average = ((minZ + maxZ) / 2.0f - charBounds.min.z) / charBounds.size.z;
 
         HitZ hit;
         if (average < 0.33f)
