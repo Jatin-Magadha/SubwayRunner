@@ -7,7 +7,7 @@ public class OnCollision : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        if (other.transform.tag == "Player")
+        if (other.transform.tag == "Player" || other.transform.tag == "Ground")
             return;
 
         controller.OnCharacterColliderHit(other);
