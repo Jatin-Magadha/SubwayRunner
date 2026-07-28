@@ -616,6 +616,115 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1196899225
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1196899226}
+  - component: {fileID: 1196899227}
+  m_Layer: 0
+  m_Name: CoinSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1196899226
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1196899225}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1196899227
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1196899225}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a5e5c4c588467e43bd24a737713852a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  coinPrefab: {fileID: 1920796290096001385, guid: 44270238cb6edaf4fa15698e23235689, type: 3}
+  poolPrewarm: 150
+  coinSpacing: 1.5
+  coinHeight: 1.2
+  arcHeight: 2
+  chanceToSkipTile: 0.15
+--- !u!1 &1386940824
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1386940825}
+  - component: {fileID: 1386940826}
+  m_Layer: 0
+  m_Name: TileSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1386940825
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1386940824}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -1.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1386940826
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1386940824}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 934d7a393152f264d9f8f4ee4face004, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  tilePrefabs:
+  - {fileID: 9104393458369320930, guid: 8f12fe88bfdcd194db6d4200069cc147, type: 3}
+  - {fileID: 1441910792746798918, guid: e6d49118e7239ed499aa641982143e36, type: 3}
+  - {fileID: 7920990494046626886, guid: 2c9943dd2241213459d67a64fd7dc79c, type: 3}
+  - {fileID: 6698246023519222589, guid: 9e8bfad5102717f4590fc54be9066319, type: 3}
+  - {fileID: 7010583852736106100, guid: 0d20ad4668dfd724887e8f89f2d5d8ad, type: 3}
+  - {fileID: 2723605148992596182, guid: 0bbd9dbf221725b4a9b3d5fbd28ba101, type: 3}
+  startingTilePrefabs:
+  - {fileID: 9104393458369320930, guid: 8f12fe88bfdcd194db6d4200069cc147, type: 3}
+  startingTileCount: 3
+  player: {fileID: 783140329}
+  coinSpawner: {fileID: 1196899227}
+  tilesAhead: 5
+  tilesBehindBuffer: 1
+  noImmediateRepeatWindow: 2
 --- !u!1 &1494199260
 GameObject:
   m_ObjectHideFlags: 0
@@ -831,3 +940,5 @@ SceneRoots:
   - {fileID: 330585546}
   - {fileID: 783140329}
   - {fileID: 1494199264}
+  - {fileID: 1386940825}
+  - {fileID: 1196899226}
