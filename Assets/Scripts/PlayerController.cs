@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 [System.Serializable]
@@ -31,6 +32,11 @@ public class PlayerController : MonoBehaviour
     public HitY hitY = HitY.None;
     public HitZ hitZ = HitZ.None;
     private SIDE lastSide;
+    public bool stopAllState = false;
+    public float stumbleTolerance = 10.0f;
+    private float stumbleTime;
+    private bool canInput = true;
+    public Collider CollisionCol;
 
     private void Start()
     {
@@ -40,14 +46,21 @@ public class PlayerController : MonoBehaviour
         animator = GetComponent<Animator>();
 
         transform.position = Vector3.zero;
+        stumbleTime = stumbleTolerance;
     }
 
     private void Update()
     {
-        swipeLeft = Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow);
-        swipeRight = Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow);
-        swipeUp = Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow);
-        swipeDown = Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow);
+        if (!canInput)
+        {
+            characterController.Move(Vector3.down * 10.0f * Time.deltaTime);
+            return;
+        }
+
+        swipeLeft = (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) && canInput;
+        swipeRight = (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) && canInput;
+        swipeUp = (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) && canInput;
+        swipeDown = (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) && canInput;
 
         if (swipeLeft && !inRoll)
         {
@@ -58,10 +71,10 @@ public class PlayerController : MonoBehaviour
 
                 if (animator)
                 {
-                    animator.Play("DodgeLeft");
+                    PlayAnimation("DodgeLeft");
                 }
             }
-            else if(side == SIDE.Right)
+            else if (side == SIDE.Right)
             {
                 lastSide = side;
 
@@ -69,15 +82,15 @@ public class PlayerController : MonoBehaviour
 
                 if (animator)
                 {
-                    animator.Play("DodgeLeft");
+                    PlayAnimation("DodgeLeft");
                 }
             }
-            else
+            else if (side != lastSide)
             {
                 lastSide = side;
                 if (animator)
                 {
-                    animator.Play("stumbleOffLeft");
+                    PlayAnimation("stumbleOffLeft");
                 }
             }
         }
@@ -90,7 +103,7 @@ public class PlayerController : MonoBehaviour
 
                 if (animator)
                 {
-                    animator.Play("DodgeRight");
+                    PlayAnimation("DodgeRight");
                 }
             }
             else if (side == SIDE.Left)
@@ -100,18 +113,24 @@ public class PlayerController : MonoBehaviour
 
                 if (animator)
                 {
-                    animator.Play("DodgeRight");
+                    PlayAnimation("DodgeRight");
                 }
             }
-            else
+            else if (side != lastSide)
             {
                 lastSide = side;
                 if (animator)
                 {
-                    animator.Play("stumbleOffRight");
+                    PlayAnimation("stumbleOffRight");
                 }
             }
         }
+
+        if (animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1)
+        {
+            stopAllState = false;
+        }
+        stumbleTime = Mathf.MoveTowards(stumbleTime, stumbleTolerance, Time.deltaTime);
 
         x = Mathf.Lerp(x, (int)side, dodgeSpeed * Time.deltaTime);
         Vector3 moveVector = new Vector3(x - transform.position.x, y * Time.deltaTime, moveSpeed * Time.deltaTime);
@@ -121,13 +140,48 @@ public class PlayerController : MonoBehaviour
         Roll();
     }
 
+    public void PlayAnimation(string animName)
+    {
+        if (stopAllState)
+            return;
+
+        animator.Play(animName);
+    }
+
+    public IEnumerator PlayDeath(string animName)
+    {
+        stopAllState = true;
+        animator.Play(animName);
+
+        yield return new WaitForSeconds(2.0f);
+
+        canInput = false;
+    }
+
+    public void Stumble(string animName)
+    {
+        animator.ForceStateNormalizedTime(0.0f);
+        stopAllState = true;
+        animator.Play(animName);
+
+        if (stumbleTime < stumbleTolerance / 2)
+        {
+            StartCoroutine(PlayDeath("stumble_Low"));
+            return;
+        }
+
+        stumbleTime -= 6;
+        ResetCollision();
+    }
+
+
     public void Jump()
     {
         if (characterController.isGrounded)
         {
             if (animator.GetCurrentAnimatorStateInfo(0).IsName("Falling"))
             {
-                animator.Play("Landing");
+                PlayAnimation("Landing");
                 inJump = false;
             }
             if (swipeUp)
@@ -143,11 +197,11 @@ public class PlayerController : MonoBehaviour
         else
         {
             y -= jumpPower * 2 * Time.deltaTime;
-            if(characterController.velocity.y < -0.1f)
-            if (animator)
-            {
-                animator.Play("Falling");
-            }
+            if (characterController.velocity.y < -0.1f)
+                if (animator)
+                {
+                    PlayAnimation("Falling");
+                }
         }
     }
 
@@ -179,55 +233,60 @@ public class PlayerController : MonoBehaviour
         hitY = GetHitY(col);
         hitZ = GetHitZ(col);
 
-        if(hitZ == HitZ.Forward && hitX == HitX.Mid)
+        if (hitZ == HitZ.Forward && hitX == HitX.Mid)
         {
-            if(hitY == HitY.Low)
+            if (hitY == HitY.Low)
             {
                 if (animator)
                 {
-                    animator.Play("stumble_low");
+                    Stumble("stumble_low");
                 }
             }
-            else if(hitY == HitY.Down)
+            else if (hitY == HitY.Down)
             {
                 if (animator)
                 {
-                    animator.Play("death_lower");
+                    StartCoroutine(PlayDeath("death_lower"));
                 }
+                ResetCollision();
             }
-            else if(hitY == HitY.Mid)
+            else if (hitY == HitY.Mid)
             {
-                if(col.tag == "MovingTrain")
+                if (col.tag == "MovingTrain")
                 {
                     if (animator)
                     {
-                        animator.Play("death_movingTrain");
+                        StartCoroutine(PlayDeath("death_movingTrain"));
+
                     }
+                    ResetCollision();
                 }
                 if (col.tag == "Ramp")
                 {
                     if (animator)
                     {
-                        animator.Play("death_bounce");
+                        StartCoroutine(PlayDeath("death_bounce"));
                     }
+                    ResetCollision();
                 }
             }
             else if (hitY == HitY.Up)
             {
                 if (animator)
                 {
-                    animator.Play("death_upper");
+                    StartCoroutine(PlayDeath("death_upper"));
                 }
+                ResetCollision();
             }
         }
-        else if(hitZ == HitZ.Mid)
+        else if (hitZ == HitZ.Mid)
         {
-            if(hitX == HitX.Right)
+            if (hitX == HitX.Right)
             {
                 if (animator)
                 {
                     side = lastSide;
-                    animator.Play("stumbleSideRight");
+                    Stumble("stumbleSideRight");
                 }
             }
             else if (hitX == HitX.Left)
@@ -235,7 +294,7 @@ public class PlayerController : MonoBehaviour
                 if (animator)
                 {
                     side = lastSide;
-                    animator.Play("stumbleSideLeft");
+                    Stumble("stumbleSideLeft");
                 }
             }
         }
@@ -245,17 +304,26 @@ public class PlayerController : MonoBehaviour
             {
                 if (animator)
                 {
-                    animator.Play("stumbleCornerRight");
+                    Stumble("stumbleCornerRight");
                 }
+                ResetCollision();
             }
             else if (hitX == HitX.Left)
             {
                 if (animator)
                 {
-                    animator.Play("stumbleCornereft");
+                    Stumble("stumbleCornerLeft");
                 }
+                ResetCollision();
             }
         }
+    }
+
+    private void ResetCollision()
+    {
+        hitX = HitX.None;
+        hitY = HitY.None;
+        hitZ = HitZ.None;
     }
 
     public HitX GetHitX(Collider col)
