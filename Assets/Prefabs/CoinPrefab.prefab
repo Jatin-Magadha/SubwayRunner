@@ -11,9 +11,10 @@ GameObject:
   - component: {fileID: 6497327117248965291}
   - component: {fileID: 7422406528829955801}
   - component: {fileID: 1332951094165078371}
+  - component: {fileID: 6906583330839945850}
   m_Layer: 0
   m_Name: CoinPrefab
-  m_TagString: Untagged
+  m_TagString: Coin
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -71,12 +72,26 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 0.3, y: 1, z: 1}
   m_Center: {x: 0, y: 0.5, z: 0}
+--- !u!114 &6906583330839945850
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1920796290096001385}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88e23d27bfa42584c98956eb22e3114e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spinSpeedDegPerSec: 180
+  value: 1
 --- !u!1001 &4456440636108625401
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -143,6 +158,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 73455c670d55f4a96bc4fb965a62b403, type: 3}
       propertyPath: m_Name
+      value: Coin
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 73455c670d55f4a96bc4fb965a62b403, type: 3}
+      propertyPath: m_TagString
       value: Coin
       objectReference: {fileID: 0}
     m_RemovedComponents: []

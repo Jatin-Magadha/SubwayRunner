@@ -45,7 +45,7 @@ public class PlayerController : MonoBehaviour
         colCenterY = characterController.center.y;
         animator = GetComponent<Animator>();
 
-        transform.position = Vector3.zero;
+        //transform.position = Vector3.zero;
         stumbleTime = stumbleTolerance;
     }
 
@@ -155,6 +155,9 @@ public class PlayerController : MonoBehaviour
         stopAllState = true;
         animator.Play(animName);
 
+        canInput = false;
+
+
         yield return new WaitForSeconds(2.0f);
 
         canInput = false;
@@ -179,6 +182,9 @@ public class PlayerController : MonoBehaviour
 
     public void Jump()
     {
+        if (inRoll)
+            return;
+
         if (characterController.isGrounded)
         {
             if (animator.GetCurrentAnimatorStateInfo(0).IsName("falling"))

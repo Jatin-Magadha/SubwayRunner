@@ -39,12 +39,23 @@ namespace SubwaySurferClone
 
         public bool IsLaneBlockedAt(int lane, float localZ)
         {
+            return IsLaneBlockedInRange(lane, localZ, localZ);
+        }
+
+        /// <summary>
+        /// True if any obstacle zone on this lane (or an all-lane obstacle) overlaps
+        /// the given [zStart, zEnd] range. Use this instead of the single-point check
+        /// when placing a coin, padded by half the coin spacing, so an obstacle that
+        /// falls *between* two coin sample points still blocks correctly.
+        /// </summary>
+        public bool IsLaneBlockedInRange(int lane, float zStart, float zEnd)
+        {
             if (obstacleZones == null) return false;
             foreach (var zone in obstacleZones)
             {
-                if (zone.lane == lane && localZ >= zone.zStart && localZ <= zone.zEnd)
-                    return true;
-                if (zone.lane == TileInfo.AllLanes && localZ >= zone.zStart && localZ <= zone.zEnd)
+                if (zone.lane != lane && zone.lane != TileInfo.AllLanes) continue;
+                // Standard interval-overlap test.
+                if (zStart <= zone.zEnd && zEnd >= zone.zStart)
                     return true;
             }
             return false;

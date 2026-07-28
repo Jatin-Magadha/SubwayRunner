@@ -10,6 +10,9 @@ public class OnCollision : MonoBehaviour
         if (other.transform.tag == "Player" || other.transform.tag == "Ground")
             return;
 
+        if (other.transform.tag == "Coin")
+            return;
+
         controller.OnCharacterColliderHit(other);
     }
 }

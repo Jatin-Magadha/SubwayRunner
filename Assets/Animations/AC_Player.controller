@@ -54,7 +54,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 0ebe25f813c9cf3438b17de90a77c882, type: 2}
+  m_Motion: {fileID: 7400000, guid: 27a0f43816049e442adce6465aac812c, type: 2}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -138,7 +138,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: dodgeLeft
-  m_Speed: 1
+  m_Speed: 1.2
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: 5371630914296853406}
@@ -151,7 +151,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: f9f959a57ccc1c746a42fd7b645a344f, type: 3}
+  m_Motion: {fileID: 7400000, guid: d991701ee5fefc44c96f8d206edceddb, type: 2}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -165,7 +165,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: dodgeRight
-  m_Speed: 1
+  m_Speed: 1.2
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: -4655107583132241397}
@@ -178,7 +178,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: 3f2d3c84a93479042a612ca637f7c0cf, type: 3}
+  m_Motion: {fileID: 7400000, guid: 8f837f9dd9d43e54ebad85f07c8dbc46, type: 2}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -425,7 +425,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: ae7352a7b5d3247fd91b37395a91ce4b, type: 3}
+  m_Motion: {fileID: 7400000, guid: 3b30a5f1267a2c04b99d8ee476240d70, type: 2}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 

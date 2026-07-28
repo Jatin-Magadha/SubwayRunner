@@ -13,6 +13,9 @@ namespace SubwaySurferClone
         private readonly Transform _parent;
         private readonly Stack<GameObject> _inactive = new Stack<GameObject>();
 
+        /// <summary>How many instances from this pool are currently active (i.e. "in the world").</summary>
+        public int ActiveCount { get; private set; }
+
         public ObjectPool(GameObject prefab, Transform parent, int prewarmCount = 0)
         {
             _prefab = prefab;
@@ -40,14 +43,18 @@ namespace SubwaySurferClone
             GameObject obj = _inactive.Count > 0 ? _inactive.Pop() : CreateNew();
             obj.transform.SetPositionAndRotation(position, rotation);
             obj.SetActive(true);
+            ActiveCount++;
             return obj;
         }
 
         public void Release(GameObject obj)
         {
+            if (!obj.activeSelf) return; // already released - avoid double-counting
+
             obj.SetActive(false);
             obj.transform.SetParent(_parent);
             _inactive.Push(obj);
+            ActiveCount = Mathf.Max(0, ActiveCount - 1);
         }
     }
 
