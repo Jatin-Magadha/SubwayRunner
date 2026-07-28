@@ -4,11 +4,12 @@ public class OnCollision : MonoBehaviour
 {
     public PlayerController controller;
 
-    private void OnCollisionEnter(Collision collision)
+
+    void OnTriggerEnter(Collider other)
     {
-        if (collision.transform.tag == "Player")
+        if (other.transform.tag == "Player")
             return;
 
-        controller.OnCharacterColliderHit(collision.collider);
+        controller.OnCharacterColliderHit(other);
     }
 }

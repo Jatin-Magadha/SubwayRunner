@@ -1,19 +1,16 @@
 using UnityEngine;
 
 [System.Serializable]
-public enum SIDE { Left, Mid, Right };
+public enum SIDE { Left = -5, Mid = 0, Right = 5 };
 
 public enum HitX { Left, Mid, Right, None };
-public enum HitY { Up, Mid, Down, None };
+public enum HitY { Up, Mid, Down, Low, None };
 public enum HitZ { Forward, Mid, Backward, None };
 
 public class PlayerController : MonoBehaviour
 {
     public SIDE side = SIDE.Mid;
 
-    private float newXPos = 0.0f;
-
-    public float xValue = 5;
     public bool swipeLeft = false;
     public bool swipeRight = false;
     public bool swipeUp = false;
@@ -33,6 +30,7 @@ public class PlayerController : MonoBehaviour
     public HitX hitX = HitX.None;
     public HitY hitY = HitY.None;
     public HitZ hitZ = HitZ.None;
+    private SIDE lastSide;
 
     private void Start()
     {
@@ -55,7 +53,7 @@ public class PlayerController : MonoBehaviour
         {
             if (side == SIDE.Mid)
             {
-                newXPos = -xValue;
+                lastSide = side;
                 side = SIDE.Left;
 
                 if (animator)
@@ -63,9 +61,10 @@ public class PlayerController : MonoBehaviour
                     animator.Play("DodgeLeft");
                 }
             }
-            else if(side == SIDE.Right) 
+            else if(side == SIDE.Right)
             {
-                newXPos = 0;
+                lastSide = side;
+
                 side = SIDE.Mid;
 
                 if (animator)
@@ -73,12 +72,20 @@ public class PlayerController : MonoBehaviour
                     animator.Play("DodgeLeft");
                 }
             }
+            else
+            {
+                lastSide = side;
+                if (animator)
+                {
+                    animator.Play("stumbleOffLeft");
+                }
+            }
         }
         if (swipeRight && !inRoll)
         {
             if (side == SIDE.Mid)
             {
-                newXPos = xValue;
+                lastSide = side;
                 side = SIDE.Right;
 
                 if (animator)
@@ -88,7 +95,7 @@ public class PlayerController : MonoBehaviour
             }
             else if (side == SIDE.Left)
             {
-                newXPos = 0;
+                lastSide = side;
                 side = SIDE.Mid;
 
                 if (animator)
@@ -96,11 +103,18 @@ public class PlayerController : MonoBehaviour
                     animator.Play("DodgeRight");
                 }
             }
+            else
+            {
+                lastSide = side;
+                if (animator)
+                {
+                    animator.Play("stumbleOffRight");
+                }
+            }
         }
 
+        x = Mathf.Lerp(x, (int)side, dodgeSpeed * Time.deltaTime);
         Vector3 moveVector = new Vector3(x - transform.position.x, y * Time.deltaTime, moveSpeed * Time.deltaTime);
-
-        x = Mathf.Lerp(x, newXPos, dodgeSpeed * Time.deltaTime);
         characterController.Move(moveVector);
 
         Jump();
@@ -161,9 +175,87 @@ public class PlayerController : MonoBehaviour
 
     public void OnCharacterColliderHit(Collider col)
     {
-        GetHitX(col);
-        GetHitY(col);
-        GetHitZ(col);
+        hitX = GetHitX(col);
+        hitY = GetHitY(col);
+        hitZ = GetHitZ(col);
+
+        if(hitZ == HitZ.Forward && hitX == HitX.Mid)
+        {
+            if(hitY == HitY.Low)
+            {
+                if (animator)
+                {
+                    animator.Play("stumble_low");
+                }
+            }
+            else if(hitY == HitY.Down)
+            {
+                if (animator)
+                {
+                    animator.Play("death_lower");
+                }
+            }
+            else if(hitY == HitY.Mid)
+            {
+                if(col.tag == "MovingTrain")
+                {
+                    if (animator)
+                    {
+                        animator.Play("death_movingTrain");
+                    }
+                }
+                if (col.tag == "Ramp")
+                {
+                    if (animator)
+                    {
+                        animator.Play("death_bounce");
+                    }
+                }
+            }
+            else if (hitY == HitY.Up)
+            {
+                if (animator)
+                {
+                    animator.Play("death_upper");
+                }
+            }
+        }
+        else if(hitZ == HitZ.Mid)
+        {
+            if(hitX == HitX.Right)
+            {
+                if (animator)
+                {
+                    side = lastSide;
+                    animator.Play("stumbleSideRight");
+                }
+            }
+            else if (hitX == HitX.Left)
+            {
+                if (animator)
+                {
+                    side = lastSide;
+                    animator.Play("stumbleSideLeft");
+                }
+            }
+        }
+        else
+        {
+            if (hitX == HitX.Right)
+            {
+                if (animator)
+                {
+                    animator.Play("stumbleCornerRight");
+                }
+            }
+            else if (hitX == HitX.Left)
+            {
+                if (animator)
+                {
+                    animator.Play("stumbleCornereft");
+                }
+            }
+        }
     }
 
     public HitX GetHitX(Collider col)
@@ -200,7 +292,11 @@ public class PlayerController : MonoBehaviour
         float average = ((minY + maxY) / 2.0f - colBounds.min.y) / charBounds.size.y;
 
         HitY hit;
-        if (average < 0.33f)
+        if (average < 0.17f)
+        {
+            hit = HitY.Low;
+        }
+        else if (average < 0.33f)
         {
             hit = HitY.Down;
         }
