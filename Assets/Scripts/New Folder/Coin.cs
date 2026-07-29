@@ -29,6 +29,12 @@ namespace SubwaySurferClone
             if (moveTowardsPlayer)
             {
                 transform.position = Vector3.MoveTowards(transform.position, playerPosition, moveSpeed * Time.deltaTime);
+
+                if (Vector3.Distance(transform.position, playerPosition) < 1.0f)
+                {
+                    Collect();
+                }
+
             }
         }
 

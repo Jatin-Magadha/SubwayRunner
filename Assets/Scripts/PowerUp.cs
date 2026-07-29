@@ -15,6 +15,16 @@ public class PowerUp : MonoBehaviour
 
     private Vector3 playerPosition;
 
+    private void Start()
+    {
+        int chance = Random.Range(0, 10);
+
+        if (chance < 3)
+        {
+            Destroy(gameObject);
+        }
+    }
+
     private void Update()
     {
         transform.Rotate(Vector3.up, 180f * Time.deltaTime, Space.World);
@@ -35,7 +45,16 @@ public class PowerUp : MonoBehaviour
             {
                 playerPosition = other.transform.position;
 
-                EnableMagnet();
+                PlayerController playerController = other.GetComponentInParent<PlayerController>();
+
+                if (playerController)
+                {
+                    playerController.EnableMagnetAbility();
+
+                    Destroy(gameObject);
+                }
+
+                //EnableMagnet();
             }
         }
     }
