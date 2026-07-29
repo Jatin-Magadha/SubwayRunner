@@ -26,7 +26,6 @@ namespace SubwaySurferClone
 
         [Header("References")]
         public Transform player;
-        public CoinPatternSpawner coinSpawner;
 
         [Header("Streaming Settings")]
         [Tooltip("How many tiles ahead of the player's current tile should exist at once.")]
@@ -154,8 +153,6 @@ namespace SubwaySurferClone
             else
             {
                 _nextSpawnZ = info.EndZ;
-                if (coinSpawner != null)
-                    coinSpawner.SpawnCoinsForTile(info);
             }
 
             _activeTiles.AddLast(new ActiveTile

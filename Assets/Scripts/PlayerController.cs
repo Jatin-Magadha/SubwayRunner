@@ -51,6 +51,9 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
+        if (GameManager.Instance.CurrentGameState != GameState.InProgress)
+            return;
+
         if (!canInput)
         {
             characterController.Move(Vector3.down * 10.0f * Time.deltaTime);
@@ -152,6 +155,8 @@ public class PlayerController : MonoBehaviour
 
     public IEnumerator PlayDeath(string animName)
     {
+        GameManager.Instance.ChangeGameState(GameState.GameOver);
+
         stopAllState = true;
         animator.Play(animName);
 
