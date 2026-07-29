@@ -228,7 +228,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b84bf1558f6d8e5478dcd6ddb7bbacfa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  length: 260
+  length: 258
   laneWidth: 5
   obstacleZones: []
   allowCoins: 1

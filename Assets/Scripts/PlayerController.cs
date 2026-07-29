@@ -112,12 +112,14 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        swipeLeft = (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) && canInput;
-        swipeRight = (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) && canInput;
-        swipeUp = (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) && canInput;
-        swipeDown = (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) && canInput;
+        //swipeLeft = (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)) && canInput;
+        //swipeRight = (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) && canInput;
+        //swipeUp = (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) && canInput;
+        //swipeDown = (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) && canInput;
 
-        ReadSwipe(true);
+        //ReadSwipe(true);
+
+        HandleMovementInput();
 
         if (swipeLeft && !inRoll)
         {
@@ -192,6 +194,7 @@ public class PlayerController : MonoBehaviour
         stumbleTime = Mathf.MoveTowards(stumbleTime, stumbleTolerance, Time.deltaTime);
 
         x = Mathf.Lerp(x, (int)side, dodgeSpeed * Time.deltaTime);
+        moveSpeed = GameManager.Instance.GetCurrentSpeed();
         Vector3 moveVector = new Vector3(x - transform.position.x, y * Time.deltaTime, moveSpeed * Time.deltaTime);
         characterController.Move(moveVector);
 
@@ -506,5 +509,64 @@ public class PlayerController : MonoBehaviour
             swipeUp = delta.y > 0 && canInput;
             swipeDown = delta.y < 0 && canInput;
         }
+    }
+
+    // Reads movement input from both keyboard and touch devices and updates
+    // the swipeLeft/swipeRight/swipeUp/swipeDown flags accordingly.
+    // Call this instead of (or alongside) the separate keyboard checks + ReadSwipe()
+    // if you want a single unified entry point for movement input.
+    private void HandleMovementInput()
+    {
+        if (!canInput)
+            return;
+
+        // --- Keyboard input ---
+        bool keyLeft = Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow);
+        bool keyRight = Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow);
+        bool keyUp = Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow);
+        bool keyDown = Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow);
+
+        // --- Touch input ---
+        bool touchLeft = false;
+        bool touchRight = false;
+        bool touchUp = false;
+        bool touchDown = false;
+
+        if (Input.touchCount > 0)
+        {
+            Touch touch = Input.GetTouch(0);
+            if (touch.phase == TouchPhase.Began)
+            {
+                touchStartPos = touch.position;
+                trackingTouch = true;
+            }
+            else if (touch.phase == TouchPhase.Ended && trackingTouch)
+            {
+                trackingTouch = false;
+                Vector2 delta = touch.position - touchStartPos;
+
+                if (delta.magnitude >= minSwipeDistance)
+                {
+                    // Determine dominant swipe axis so a diagonal swipe
+                    // doesn't trigger both a horizontal and vertical move.
+                    if (Mathf.Abs(delta.x) > Mathf.Abs(delta.y))
+                    {
+                        touchLeft = delta.x < 0;
+                        touchRight = delta.x > 0;
+                    }
+                    else
+                    {
+                        touchUp = delta.y > 0;
+                        touchDown = delta.y < 0;
+                    }
+                }
+            }
+        }
+
+        // --- Combine both input sources ---
+        swipeLeft = (keyLeft || touchLeft) && canInput;
+        swipeRight = (keyRight || touchRight) && canInput;
+        swipeUp = (keyUp || touchUp) && canInput;
+        swipeDown = (keyDown || touchDown) && canInput;
     }
 }

@@ -22,6 +22,11 @@ public class GameManager : MonoBehaviour
     public float startingSpeed = 10.0f;
     public float maxSpeed = 30.0f;
 
+    [Header("Time")]
+    public float timeToReachMaxSpeed = 300f; // 5 minutes
+
+    private float gameStartTime;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -48,6 +53,8 @@ public class GameManager : MonoBehaviour
         ScoreManager.Instance.StartGame();
 
         ChangeGameState(GameState.InProgress);
+
+        gameStartTime = Time.time;
     }
 
     public void ChangeGameState(GameState newState)
@@ -69,5 +76,16 @@ public class GameManager : MonoBehaviour
         //SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
 
         onMenuClicked?.Invoke(this, EventArgs.Empty);
+    }
+
+    public float GetCurrentSpeed()
+    {
+        float elapsed = Time.time - gameStartTime;
+
+        // Normalize from 0 to 1
+        float t = Mathf.Clamp01(elapsed / timeToReachMaxSpeed);
+
+        // Interpolate between min and max speed
+        return Mathf.Lerp(startingSpeed, maxSpeed, t);
     }
 }
