@@ -1,4 +1,6 @@
+using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public enum GameState
 {
@@ -13,6 +15,9 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance { get; private set; }
 
     public GameState CurrentGameState { get; private set; }
+
+    public event EventHandler onMenuClicked;
+    public event EventHandler onGameStarted;
 
     private void Awake()
     {
@@ -29,11 +34,14 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
-        StartGame();
+        //StartGame();
+        ChangeGameState(GameState.Menu);
     }
 
     public void StartGame()
     {
+        onGameStarted?.Invoke(this, EventArgs.Empty);
+
         ScoreManager.Instance.StartGame();
 
         ChangeGameState(GameState.InProgress);
@@ -42,5 +50,20 @@ public class GameManager : MonoBehaviour
     public void ChangeGameState(GameState newState)
     {
         CurrentGameState = newState;
+
+        MenuManager.Instance.UpdateMenu();
+    }
+
+    public void RestartGame()
+    {
+        //SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void MainMenu()
+    {
+        ChangeGameState(GameState.Menu);
+        //SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+
+        onMenuClicked?.Invoke(this, EventArgs.Empty);
     }
 }

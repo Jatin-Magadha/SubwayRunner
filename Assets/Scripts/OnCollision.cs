@@ -13,6 +13,10 @@ public class OnCollision : MonoBehaviour
         if (other.transform.tag == "Coin")
             return;
 
+        if (other.transform.tag == "PowerUp")
+            return;
+
+
         controller.OnCharacterColliderHit(other);
     }
 }

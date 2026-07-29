@@ -5,14 +5,24 @@ namespace SubwaySurferClone
 {
     /// <summary>
     /// The core of the endless runner: keeps a rolling window of tile prefabs
-    /// ahead of the player, recycles ones that fall behind, and asks the
-    /// CoinPatternSpawner to fill each new tile with coins.
+    /// ahead of the player, recycles ones that fall behind, and hands each new
+    /// tile off (e.g. to a TileCoinSpawner) to be filled with coins.
     ///
     /// Setup:
     /// 1. Drag your tile prefabs (each with a TileInfo component) into "tilePrefabs".
     /// 2. Assign "player" to the runner's transform.
-    /// 3. Assign a CoinPatternSpawner (can live on this same GameObject).
-    /// 4. Set how many tiles should exist ahead of the player at once ("tilesAhead").
+    /// 3. Set how many tiles should exist ahead of the player at once ("tilesAhead").
+    ///
+    /// Restart flow:
+    /// - GameManager.onMenuClicked  -> tiles are recycled back to their pools, nothing spawns.
+    /// - GameManager.onGameStarted  -> any leftover tiles are recycled first (so this is safe
+    ///   to call even if onMenuClicked never fired first - e.g. a "restart" button that jumps
+    ///   straight back into a run), THEN a fresh set is spawned from z = 0.
+    ///
+    /// This is the ONLY place tiles get spawned - there is no separate spawn call in Start().
+    /// Previously, Start() spawned an initial set AND GameManager_onGameStarted spawned
+    /// another full set on top of it (both starting at z = 0), which is what caused tiles
+    /// to visibly overlap at the starting position after a restart.
     /// </summary>
     public class EndlessTileGenerator : MonoBehaviour
     {
@@ -42,7 +52,13 @@ namespace SubwaySurferClone
         private readonly List<GameObject> _recentPrefabHistory = new List<GameObject>();
 
         private float _nextSpawnZ = 0f;
-        private System.Random _rng = new System.Random();
+        private readonly System.Random _rng = new System.Random();
+
+        /// <summary>
+        /// True only while a run is actually in progress. Update() no-ops while this is
+        /// false, so nothing spawns or recycles while sitting at the menu.
+        /// </summary>
+        private bool _isRunning = false;
 
         private struct ActiveTile
         {
@@ -53,17 +69,73 @@ namespace SubwaySurferClone
 
         private void Awake()
         {
+            BuildPoolsIfNeeded();
+        }
+
+        /// <summary>
+        /// Creates a pool per unique prefab, once. Called only from Awake - restarts reuse
+        /// these same pools (via ClearActiveTiles/SpawnTile) instead of rebuilding them,
+        /// so no GameObjects get orphaned across repeated menu <-> game transitions.
+        /// </summary>
+        private void BuildPoolsIfNeeded()
+        {
             foreach (var prefab in tilePrefabs)
-                _tilePools[prefab] = new ObjectPool(prefab, transform, prewarmCount: 2);
+                if (!_tilePools.ContainsKey(prefab))
+                    _tilePools[prefab] = new ObjectPool(prefab, transform, prewarmCount: 2);
 
             foreach (var prefab in startingTilePrefabs)
                 if (!_tilePools.ContainsKey(prefab))
                     _tilePools[prefab] = new ObjectPool(prefab, transform, prewarmCount: 2);
         }
 
-        private void Start()
+        private void OnEnable()
         {
-            // Seed initial tiles so the player always has ground/track under them at start.
+            GameManager.Instance.onGameStarted += GameManager_onGameStarted;
+            GameManager.Instance.onMenuClicked += GameManager_onMenuClicked;
+        }
+
+        private void OnDisable()
+        {
+            GameManager.Instance.onGameStarted -= GameManager_onGameStarted;
+            GameManager.Instance.onMenuClicked -= GameManager_onMenuClicked;
+        }
+
+        private void GameManager_onGameStarted(object sender, System.EventArgs e)
+        {
+            // Recycle anything still active first. This guards against double-spawning
+            // even if this event fires while tiles from a previous run are still around.
+            ClearActiveTiles();
+
+            _nextSpawnZ = 0f;
+            _recentPrefabHistory.Clear();
+            _isRunning = true;
+
+            SpawnInitialSet();
+        }
+
+        private void GameManager_onMenuClicked(object sender, System.EventArgs e)
+        {
+            _isRunning = false;
+            ClearActiveTiles();
+        }
+
+        private void Update()
+        {
+            if (!_isRunning || player == null) return;
+
+            // Spawn ahead: if the player has advanced enough that fewer than
+            // `tilesAhead` tiles remain in front of them, add another.
+            while (CountTilesAheadOfPlayer() < tilesAhead)
+            {
+                SpawnTile(PickNextPrefab());
+            }
+
+            RecycleTilesBehindPlayer();
+        }
+
+        /// <summary>Spawns the fixed starting tiles, then fills up to tilesAhead with random ones.</summary>
+        private void SpawnInitialSet()
+        {
             for (int i = 0; i < startingTileCount && startingTilePrefabs.Length > 0; i++)
             {
                 SpawnTile(startingTilePrefabs[i % startingTilePrefabs.Length]);
@@ -74,18 +146,23 @@ namespace SubwaySurferClone
             }
         }
 
-        private void Update()
+        /// <summary>
+        /// Recycles every currently active tile back into its own pool and empties the
+        /// active list. Pools themselves are kept alive (not rebuilt) so their existing
+        /// inactive instances get reused on the next spawn instead of leaking orphaned
+        /// GameObjects and instantiating brand-new ones on every restart.
+        /// </summary>
+        private void ClearActiveTiles()
         {
-            if (player == null) return;
-
-            // Spawn ahead: if the player has advanced enough that fewer than
-            // `tilesAhead` tiles remain in front of them, add another.
-            while (CountTilesAheadOfPlayer() < tilesAhead)
+            while (_activeTiles.Count > 0)
             {
-                SpawnTile(PickNextPrefab());
+                ActiveTile oldest = _activeTiles.First.Value;
+                if (oldest.sourcePrefab != null && _tilePools.TryGetValue(oldest.sourcePrefab, out ObjectPool pool))
+                {
+                    pool.Release(oldest.instance);
+                }
+                _activeTiles.RemoveFirst();
             }
-
-            RecycleTilesBehindPlayer();
         }
 
         private int CountTilesAheadOfPlayer()

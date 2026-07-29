@@ -38,6 +38,9 @@ public class PlayerController : MonoBehaviour
     private bool canInput = true;
     public Collider CollisionCol;
 
+    [SerializeField] private Vector3 initialPosition;
+    [SerializeField] private GameObject magnetRangeObject;
+
     private void Start()
     {
         characterController = GetComponent<CharacterController>();
@@ -47,6 +50,46 @@ public class PlayerController : MonoBehaviour
 
         //transform.position = Vector3.zero;
         stumbleTime = stumbleTolerance;
+    }
+
+    private void OnEnable()
+    {
+        GameManager.Instance.onMenuClicked += GameManager_onMenuClicked;
+        GameManager.Instance.onGameStarted += GameManager_onGameStarted;
+    }
+
+    private void OnDisable()
+    {
+        GameManager.Instance.onMenuClicked -= GameManager_onMenuClicked;
+        GameManager.Instance.onGameStarted -= GameManager_onGameStarted;
+    }
+
+    private void GameManager_onMenuClicked(object sender, System.EventArgs e)
+    {
+        ResetGame();
+    }
+    private void GameManager_onGameStarted(object sender, System.EventArgs e)
+    {
+
+    }
+
+    private void ResetGame()
+    {
+        transform.position = initialPosition;
+
+        canInput = true;
+        stopAllState = false;
+        ResetCollision();
+
+        characterController = GetComponent<CharacterController>();
+        colHeight = characterController.height;
+        colCenterY = characterController.center.y;
+        animator = GetComponent<Animator>();
+
+        //transform.position = Vector3.zero;
+        stumbleTime = stumbleTolerance;
+
+        side = SIDE.Mid;
     }
 
     private void Update()
@@ -165,7 +208,7 @@ public class PlayerController : MonoBehaviour
 
         yield return new WaitForSeconds(2.0f);
 
-        canInput = false;
+        //canInput = false;
     }
 
     public void Stumble(string animName)
@@ -416,5 +459,19 @@ public class PlayerController : MonoBehaviour
             hit = HitZ.Forward;
         }
         return hit;
+    }
+
+    public void EnableMagnetAbility()
+    {
+        CancelInvoke(nameof(DisableMagnetAbility));
+
+        magnetRangeObject.SetActive(true);
+
+        Invoke(nameof(DisableMagnetAbility), 15.0f);
+    }
+
+    public void DisableMagnetAbility()
+    {
+        magnetRangeObject.SetActive(false);
     }
 }
