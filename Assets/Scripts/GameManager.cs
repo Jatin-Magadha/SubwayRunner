@@ -51,7 +51,8 @@ public class GameManager : MonoBehaviour
     {
         CurrentGameState = newState;
 
-        MenuManager.Instance.UpdateMenu();
+        if (MenuManager.Instance != null)
+            MenuManager.Instance.UpdateMenu();
     }
 
     public void RestartGame()
