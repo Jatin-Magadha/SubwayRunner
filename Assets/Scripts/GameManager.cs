@@ -19,6 +19,9 @@ public class GameManager : MonoBehaviour
     public event EventHandler onMenuClicked;
     public event EventHandler onGameStarted;
 
+    public float startingSpeed = 10.0f;
+    public float maxSpeed = 30.0f;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)

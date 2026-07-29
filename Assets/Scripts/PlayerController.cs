@@ -41,6 +41,13 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Vector3 initialPosition;
     [SerializeField] private GameObject magnetRangeObject;
 
+    // Touch
+    private Vector2 touchStartPos;
+    private bool trackingTouch;
+
+    [Header("Swipe Input")]
+    public float minSwipeDistance = 50f;
+
     private void Start()
     {
         characterController = GetComponent<CharacterController>();
@@ -50,6 +57,8 @@ public class PlayerController : MonoBehaviour
 
         //transform.position = Vector3.zero;
         stumbleTime = stumbleTolerance;
+     
+        moveSpeed = GameManager.Instance.startingSpeed;
     }
 
     private void OnEnable()
@@ -70,7 +79,7 @@ public class PlayerController : MonoBehaviour
     }
     private void GameManager_onGameStarted(object sender, System.EventArgs e)
     {
-
+        moveSpeed = GameManager.Instance.startingSpeed;
     }
 
     private void ResetGame()
@@ -107,6 +116,8 @@ public class PlayerController : MonoBehaviour
         swipeRight = (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)) && canInput;
         swipeUp = (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)) && canInput;
         swipeDown = (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)) && canInput;
+
+        ReadSwipe(true);
 
         if (swipeLeft && !inRoll)
         {
@@ -473,5 +484,27 @@ public class PlayerController : MonoBehaviour
     public void DisableMagnetAbility()
     {
         magnetRangeObject.SetActive(false);
+    }
+
+    private void ReadSwipe(bool fullInput)
+    {
+        if (Input.touchCount == 0) return;
+        Touch touch = Input.GetTouch(0);
+        if (touch.phase == TouchPhase.Began)
+        {
+            touchStartPos = touch.position;
+            trackingTouch = true;
+        }
+        else if (touch.phase == TouchPhase.Ended && trackingTouch)
+        {
+            trackingTouch = false;
+            Vector2 delta = touch.position - touchStartPos;
+            if (delta.magnitude < minSwipeDistance) return;
+
+            swipeLeft = delta.x < 0 && canInput;
+            swipeRight = delta.x > 0 && canInput;
+            swipeUp = delta.y > 0 && canInput;
+            swipeDown = delta.y < 0 && canInput;
+        }
     }
 }

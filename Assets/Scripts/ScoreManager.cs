@@ -13,6 +13,9 @@ public class ScoreManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI inGameScoreUI;
     [SerializeField] private TextMeshProUGUI inGameCoinUI;
 
+    [SerializeField] private TextMeshProUGUI gameOverScoreUI;
+    [SerializeField] private TextMeshProUGUI gameOverCoinUI;
+
     private bool isMultiplierActivated = true;
 
     private void Awake()
@@ -70,6 +73,12 @@ public class ScoreManager : MonoBehaviour
 
         inGameCoinUI.text = currentCoins.ToString();
         inGameScoreUI.text = currentScore.ToString();
+    }
+
+    public void UpdateGameOverData()
+    {
+        gameOverCoinUI.text = currentCoins.ToString();
+        gameOverScoreUI.text = currentScore.ToString();
     }
 
     public void ActivateMultiplier()
