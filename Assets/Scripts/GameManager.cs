@@ -66,6 +66,13 @@ public class GameManager : MonoBehaviour
 
         if (MenuManager.Instance != null)
             MenuManager.Instance.UpdateMenu();
+
+        switch (CurrentGameState)
+        {
+            case GameState.GameOver:
+                ScoreManager.Instance.UpdateGameOverData();
+                break;
+        }
     }
 
     public void RestartGame()

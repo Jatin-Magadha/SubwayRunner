@@ -73,6 +73,8 @@ public class ScoreManager : MonoBehaviour
 
         inGameCoinUI.text = currentCoins.ToString();
         inGameScoreUI.text = currentScore.ToString();
+
+        isMultiplierActivated = false;
     }
 
     public void UpdateGameOverData()

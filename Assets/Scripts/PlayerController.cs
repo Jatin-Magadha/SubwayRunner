@@ -227,6 +227,9 @@ public class PlayerController : MonoBehaviour
 
         canInput = false;
 
+        CancelInvoke(nameof(DisableMagnetAbility));
+
+        DisableMagnetAbility();
 
         yield return new WaitForSeconds(2.0f);
 
@@ -270,6 +273,11 @@ public class PlayerController : MonoBehaviour
                     animator.CrossFadeInFixedTime("jump", 0.1f);
                     inJump = true;
                 }
+            }
+            else if (inJump)
+            {
+                PlayAnimation("landing");
+                inJump = false;
             }
         }
         else
@@ -322,7 +330,8 @@ public class PlayerController : MonoBehaviour
             {
                 if (animator)
                 {
-                    Stumble("stumble_low");
+                    //Stumble("stumble_low");
+                    StartCoroutine(PlayDeath("death_lower"));
                 }
             }
             else if (hitY == HitY.Down)
