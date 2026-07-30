@@ -25,6 +25,7 @@ public class PlayerController : MonoBehaviour
     public bool inJump = false;
     public bool inRoll = false;
     public float moveSpeed = 7.0f;
+    public float maxRollTimer = 0.4f;
     private float colHeight;
     private float colCenterY;
     internal float rollCounter;
@@ -287,10 +288,15 @@ public class PlayerController : MonoBehaviour
         }
         if (swipeDown)
         {
-            rollCounter = 0.2f;
+            if (inJump)
+            {
+                y -= jumpPower * 50 * Time.deltaTime;
+            }
+
+            rollCounter = maxRollTimer;
             y -= 10.0f;
-            characterController.center = new Vector3(0, colCenterY / 2.0f, 0);
-            characterController.height = colHeight / 2.0f;
+            characterController.center = new Vector3(0, colCenterY / 3.0f, 0);
+            characterController.height = colHeight / 3.0f;
             animator.CrossFadeInFixedTime("roll", 0.1f);
             inRoll = true;
             inJump = false;
