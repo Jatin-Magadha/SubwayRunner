@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace SubwaySurferClone
@@ -18,10 +19,32 @@ namespace SubwaySurferClone
 
         [SerializeField] private AudioClip coinCollectionClip;
 
+        private Vector3 initialPos;
+
 
         private void Awake()
         {
             GetComponent<Collider>().isTrigger = true;
+        }
+
+        private void Start()
+        {
+            GameManager.Instance.onGameStarted += GameManager_onGameStarted;
+
+            initialPos = transform.localPosition;
+        }
+
+        private void OnDestroy()
+        {
+            GameManager.Instance.onGameStarted -= GameManager_onGameStarted;
+        }
+
+        private void GameManager_onGameStarted(object sender, EventArgs e)
+        {
+            gameObject.SetActive(true);
+
+            moveTowardsPlayer = false;
+            transform.localPosition = initialPos;
         }
 
         private void Update()
@@ -51,9 +74,11 @@ namespace SubwaySurferClone
         {
             ScoreManager.Instance.AddCoin();
 
-            GameManager.Instance.PlayAudio(coinCollectionClip); 
+            GameManager.Instance.PlayAudio(coinCollectionClip);
 
-            Destroy(gameObject);
+            moveTowardsPlayer = false;
+
+            gameObject.SetActive(false);
         }
 
         public void EnableMagnetAbility(Vector3 pos)

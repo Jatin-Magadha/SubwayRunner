@@ -34,7 +34,7 @@ public class ScoreManager : MonoBehaviour
 
     private void UpdateScore()
     {
-        if (GameManager.Instance.CurrentGameState == GameState.InProgress)
+        if (GameManager.Instance.CurrentGameState != GameState.InProgress)
         {
             CancelInvoke(nameof(UpdateScore));
         }

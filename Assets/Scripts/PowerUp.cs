@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public enum PowerUpType
@@ -17,11 +18,25 @@ public class PowerUp : MonoBehaviour
 
     private void Start()
     {
-        int chance = Random.Range(0, 10);
+        GameManager.Instance.onGameStarted += GameManager_onGameStarted;
+    }
+
+    private void OnDestroy()
+    {
+        GameManager.Instance.onGameStarted -= GameManager_onGameStarted;
+    }
+
+    private void GameManager_onGameStarted(object sender, EventArgs e)
+    {
+        gameObject.SetActive(true);
+
+        int chance = UnityEngine.Random.Range(0, 10);
 
         if (chance < 3)
         {
-            Destroy(gameObject);
+            //Destroy(gameObject);
+
+            gameObject.SetActive(false);
         }
     }
 
@@ -38,7 +53,8 @@ public class PowerUp : MonoBehaviour
             {
                 ScoreManager.Instance.ActivateMultiplier();
 
-                Destroy(gameObject);
+                //Destroy(gameObject);
+                gameObject.SetActive(false);
             }
 
             if (powerUpType == PowerUpType.Magnet)
@@ -51,31 +67,11 @@ public class PowerUp : MonoBehaviour
                 {
                     playerController.EnableMagnetAbility();
 
-                    Destroy(gameObject);
+                    //Destroy(gameObject);
+                    gameObject.SetActive(false);
                 }
-
-                //EnableMagnet();
             }
         }
     }
 
-    private void EnableMagnet()
-    {
-        float timer = duration;
-        while (timer > 0f)
-        {
-            Collider[] nearbyCoins = Physics.OverlapSphere(playerPosition, magnetRadius);
-            foreach (var col in nearbyCoins)
-            {
-                if (col.CompareTag("Coin"))
-                {
-                    col.transform.position = Vector3.MoveTowards(
-                        col.transform.position, playerPosition, moveSpeed * Time.deltaTime);
-                }
-            }
-            timer -= Time.deltaTime;
-        }
-
-        Destroy(gameObject, timer);
-    }
 }

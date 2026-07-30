@@ -431,41 +431,13 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 2465371746300847359}
     m_Modifications:
-    - target: {fileID: 412471975148988, guid: 1d37fdef3cc0a76499252bf17bc18c6f, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2306149392738855747, guid: 1d37fdef3cc0a76499252bf17bc18c6f, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -0.00000333786
-      objectReference: {fileID: 0}
-    - target: {fileID: 2306149392738855747, guid: 1d37fdef3cc0a76499252bf17bc18c6f, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 1.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 2306149392738855747, guid: 1d37fdef3cc0a76499252bf17bc18c6f, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5937970592178622626, guid: 1d37fdef3cc0a76499252bf17bc18c6f, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0.00000333786
-      objectReference: {fileID: 0}
-    - target: {fileID: 5937970592178622626, guid: 1d37fdef3cc0a76499252bf17bc18c6f, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 1.4999995
-      objectReference: {fileID: 0}
-    - target: {fileID: 5937970592178622626, guid: 1d37fdef3cc0a76499252bf17bc18c6f, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -5
-      objectReference: {fileID: 0}
     - target: {fileID: 7334329691496748925, guid: 1d37fdef3cc0a76499252bf17bc18c6f, type: 3}
       propertyPath: m_Name
       value: Obstacle1
       objectReference: {fileID: 0}
     - target: {fileID: 8844449464415082082, guid: 1d37fdef3cc0a76499252bf17bc18c6f, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -92.75
+      value: -40.25
       objectReference: {fileID: 0}
     - target: {fileID: 8844449464415082082, guid: 1d37fdef3cc0a76499252bf17bc18c6f, type: 3}
       propertyPath: m_LocalPosition.y

@@ -60,6 +60,8 @@ public class PlayerController : MonoBehaviour
         stumbleTime = stumbleTolerance;
      
         moveSpeed = GameManager.Instance.startingSpeed;
+
+        PlayAnimation("idle");
     }
 
     private void OnEnable()
@@ -77,10 +79,15 @@ public class PlayerController : MonoBehaviour
     private void GameManager_onMenuClicked(object sender, System.EventArgs e)
     {
         ResetGame();
+
+        PlayAnimation("idle");
     }
     private void GameManager_onGameStarted(object sender, System.EventArgs e)
     {
         moveSpeed = GameManager.Instance.startingSpeed;
+
+        PlayAnimation("run");
+        ResetCollision();
     }
 
     private void ResetGame()
