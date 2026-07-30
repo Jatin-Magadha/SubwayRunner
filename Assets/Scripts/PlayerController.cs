@@ -345,6 +345,13 @@ public class PlayerController : MonoBehaviour
                     }
                     ResetCollision();
                 }
+                else
+                {
+                    if (animator)
+                    {
+                        StartCoroutine(PlayDeath("death_lower"));
+                    }
+                }
             }
             else if (hitY == HitY.Up)
             {
