@@ -16,6 +16,8 @@ namespace SubwaySurferClone
         private Vector3 playerPosition;
         [SerializeField] private float moveSpeed = 0.2f;
 
+        [SerializeField] private AudioClip coinCollectionClip;
+
 
         private void Awake()
         {
@@ -48,6 +50,8 @@ namespace SubwaySurferClone
         private void Collect()
         {
             ScoreManager.Instance.AddCoin();
+
+            GameManager.Instance.PlayAudio(coinCollectionClip); 
 
             Destroy(gameObject);
         }

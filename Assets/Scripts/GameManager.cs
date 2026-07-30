@@ -22,10 +22,13 @@ public class GameManager : MonoBehaviour
     public float startingSpeed = 10.0f;
     public float maxSpeed = 30.0f;
 
+    [SerializeField] private AudioSource audioSource;
+
     [Header("Time")]
     public float timeToReachMaxSpeed = 300f; // 5 minutes
 
     private float gameStartTime;
+
 
     private void Awake()
     {
@@ -87,5 +90,10 @@ public class GameManager : MonoBehaviour
 
         // Interpolate between min and max speed
         return Mathf.Lerp(startingSpeed, maxSpeed, t);
+    }
+
+    public void PlayAudio(AudioClip clip)
+    {
+        audioSource.PlayOneShot(clip);
     }
 }

@@ -121,6 +121,7 @@ MonoBehaviour:
   spinSpeedDegPerSec: 180
   value: 1
   moveSpeed: 50
+  coinCollectionClip: {fileID: 8300000, guid: 67a38615cdfa08d48830e8345389929b, type: 3}
 --- !u!1001 &4456440636108625401
 PrefabInstance:
   m_ObjectHideFlags: 0
