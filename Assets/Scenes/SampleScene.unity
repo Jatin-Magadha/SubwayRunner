@@ -1994,6 +1994,7 @@ MonoBehaviour:
   swipeRight: 0
   swipeUp: 0
   swipeDown: 0
+  capsuleCollider: {fileID: 1804194987}
   dodgeSpeed: 3
   jumpPower: 15
   inJump: 0

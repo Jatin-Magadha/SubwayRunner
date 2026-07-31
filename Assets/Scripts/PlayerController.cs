@@ -17,6 +17,7 @@ public class PlayerController : MonoBehaviour
     public bool swipeUp = false;
     public bool swipeDown = false;
     private CharacterController characterController;
+    [SerializeField] private CapsuleCollider capsuleCollider;
     private Animator animator;
     private float x;
     public float dodgeSpeed = 10.0f;
@@ -28,6 +29,8 @@ public class PlayerController : MonoBehaviour
     public float maxRollTimer = 0.4f;
     private float colHeight;
     private float colCenterY;
+    private float rolColRadius;
+    private float rolColHeight;
     internal float rollCounter;
     public HitX hitX = HitX.None;
     public HitY hitY = HitY.None;
@@ -55,6 +58,9 @@ public class PlayerController : MonoBehaviour
         colHeight = characterController.height;
         colCenterY = characterController.center.y;
         animator = GetComponent<Animator>();
+
+        rolColRadius = capsuleCollider.radius;
+        rolColHeight = capsuleCollider.height;
 
         //transform.position = Vector3.zero;
         stumbleTime = stumbleTolerance;
@@ -282,7 +288,15 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            y -= jumpPower * 2 * Time.deltaTime;
+            if (swipeRight || swipeLeft)
+            {
+                y -= jumpPower * Time.deltaTime;
+            }
+            else
+            {
+                y -= jumpPower * 2 * Time.deltaTime;
+            }
+
             if (characterController.velocity.y < -0.1f)
                 if (animator)
                 {
@@ -300,6 +314,9 @@ public class PlayerController : MonoBehaviour
             characterController.center = new Vector3(0, colCenterY, 0);
             characterController.height = colHeight;
             inRoll = false;
+
+            capsuleCollider.height = rolColHeight;
+            capsuleCollider.radius = rolColRadius;
         }
         if (swipeDown)
         {
@@ -310,11 +327,14 @@ public class PlayerController : MonoBehaviour
 
             rollCounter = maxRollTimer;
             y -= 10.0f;
-            characterController.center = new Vector3(0, colCenterY / 3.0f, 0);
-            characterController.height = colHeight / 3.0f;
+            characterController.center = new Vector3(0, colCenterY / 4.0f, 0);
+            characterController.height = colHeight / 4.0f;
             animator.CrossFadeInFixedTime("roll", 0.1f);
             inRoll = true;
             inJump = false;
+
+            capsuleCollider.height = rolColHeight / 4;
+            capsuleCollider.radius = rolColRadius / 4;
         }
     }
 
