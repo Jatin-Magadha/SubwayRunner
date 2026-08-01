@@ -79,6 +79,8 @@ public class ScoreManager : MonoBehaviour
 
     public void UpdateGameOverData()
     {
+        NetworkDataManager.Instance.SendScoreToLeaderboard(currentScore);
+
         gameOverCoinUI.text = currentCoins.ToString();
         gameOverScoreUI.text = currentScore.ToString();
     }
