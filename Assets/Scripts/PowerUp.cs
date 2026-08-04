@@ -14,6 +14,8 @@ public class PowerUp : MonoBehaviour
     [SerializeField] private float magnetRadius = 50.0f;
     [SerializeField] private float moveSpeed = 0.2f;
 
+    [SerializeField] private AudioClip powerUpCollectAudio;
+
     private Vector3 playerPosition;
 
     private void Start()
@@ -52,6 +54,8 @@ public class PowerUp : MonoBehaviour
             if (powerUpType == PowerUpType.Multiplier)
             {
                 ScoreManager.Instance.ActivateMultiplier();
+
+                GameManager.Instance.PlayAudio(powerUpCollectAudio);
 
                 //Destroy(gameObject);
                 gameObject.SetActive(false);

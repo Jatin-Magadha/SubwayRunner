@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 
 [System.Serializable]
 public enum SIDE { Left = -5, Mid = 0, Right = 5 };
@@ -51,6 +52,17 @@ public class PlayerController : MonoBehaviour
 
     [Header("Swipe Input")]
     public float minSwipeDistance = 50f;
+
+    [Header("Audios")]
+    [SerializeField] private AudioClip dodgeClip;
+    [SerializeField] private AudioClip rollClip;
+
+    // Ability
+    [SerializeField] private GameObject magnetAbilityIcon;
+    [SerializeField] private Slider magnetAbilitySlider;
+    private bool isMagnetActivated = false;
+    private float magnetTimer = 15.0f;
+    private float currentMagnetTimerLeft = 0;
 
     private void Start()
     {
@@ -146,6 +158,7 @@ public class PlayerController : MonoBehaviour
                 {
                     PlayAnimation("dodgeLeft");
                 }
+                GameManager.Instance.PlayAudio(dodgeClip);
             }
             else if (side == SIDE.Right)
             {
@@ -157,6 +170,7 @@ public class PlayerController : MonoBehaviour
                 {
                     PlayAnimation("dodgeLeft");
                 }
+                GameManager.Instance.PlayAudio(dodgeClip);
             }
             else if (side != lastSide)
             {
@@ -178,6 +192,7 @@ public class PlayerController : MonoBehaviour
                 {
                     PlayAnimation("dodgeRight");
                 }
+                GameManager.Instance.PlayAudio(dodgeClip);
             }
             else if (side == SIDE.Left)
             {
@@ -188,6 +203,7 @@ public class PlayerController : MonoBehaviour
                 {
                     PlayAnimation("dodgeRight");
                 }
+                GameManager.Instance.PlayAudio(dodgeClip);
             }
             else if (side != lastSide)
             {
@@ -214,6 +230,8 @@ public class PlayerController : MonoBehaviour
 
         Jump();
         Roll();
+
+        CalculateMagnetTimer();
     }
 
     public void PlayAnimation(string animName)
@@ -335,6 +353,8 @@ public class PlayerController : MonoBehaviour
 
             capsuleCollider.height = rolColHeight / 4;
             capsuleCollider.radius = rolColRadius / 4;
+
+            GameManager.Instance.PlayAudio(rollClip);
         }
     }
 
@@ -526,16 +546,38 @@ public class PlayerController : MonoBehaviour
 
     public void EnableMagnetAbility()
     {
-        CancelInvoke(nameof(DisableMagnetAbility));
+        //CancelInvoke(nameof(DisableMagnetAbility));
 
         magnetRangeObject.SetActive(true);
 
-        Invoke(nameof(DisableMagnetAbility), 15.0f);
+        //Invoke(nameof(DisableMagnetAbility), 15.0f);
+
+        isMagnetActivated = true;
+        currentMagnetTimerLeft = magnetTimer;
+        magnetAbilityIcon.SetActive(true);
+    }
+
+    private void CalculateMagnetTimer()
+    {
+        if (!isMagnetActivated)
+            return;
+
+        currentMagnetTimerLeft -= Time.deltaTime;
+
+        magnetAbilitySlider.value = currentMagnetTimerLeft / magnetTimer;
+
+        if (currentMagnetTimerLeft <= 0)
+        {
+            DisableMagnetAbility();
+        }
     }
 
     public void DisableMagnetAbility()
     {
         magnetRangeObject.SetActive(false);
+
+        isMagnetActivated = false;
+        magnetAbilityIcon.SetActive(false);
     }
 
     private void ReadSwipe(bool fullInput)

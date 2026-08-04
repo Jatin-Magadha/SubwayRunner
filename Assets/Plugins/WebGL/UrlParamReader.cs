@@ -3,9 +3,12 @@ using System.Runtime.InteropServices;
 
 public class UrlParamReader : MonoBehaviour
 {
+#if UNITY_WEBGL && !UNITY_EDITOR
     // Import the JS function
     [DllImport("__Internal")]
     private static extern System.IntPtr GetURLParameter(string paramName);
+
+#endif
 
     // Helper to convert pointer to string
 

@@ -8,6 +8,7 @@ public class MenuManager : MonoBehaviour
     [SerializeField] private GameObject mainMenu;
     [SerializeField] private GameObject inGameMenu;
     [SerializeField] private GameObject gameOverMenu;
+    [SerializeField] private GameObject pauseMenu;
 
     private void Start()
     {
@@ -24,12 +25,21 @@ public class MenuManager : MonoBehaviour
                 mainMenu.SetActive(true);
                 inGameMenu.SetActive(false);
                 gameOverMenu.SetActive(false);
+                pauseMenu.SetActive(false);
                 break;
 
             case GameState.InProgress:
                 mainMenu.SetActive(false);
                 inGameMenu.SetActive(true);
                 gameOverMenu.SetActive(false);
+                pauseMenu.SetActive(false);
+                break;
+
+            case GameState.Paused:
+                mainMenu.SetActive(false);
+                inGameMenu.SetActive(false);
+                gameOverMenu.SetActive(false);
+                pauseMenu.SetActive(true);
                 break;
 
             case GameState.GameOver:
@@ -43,5 +53,6 @@ public class MenuManager : MonoBehaviour
         mainMenu.SetActive(false);
         inGameMenu.SetActive(false);
         gameOverMenu.SetActive(true);
+        pauseMenu.SetActive(false);
     }
 }

@@ -1,5 +1,7 @@
+using System.Timers;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class ScoreManager : MonoBehaviour
 {
@@ -8,7 +10,7 @@ public class ScoreManager : MonoBehaviour
     private int totalCoins;
     private int currentCoins;
 
-    private int currentScore = 0;
+    private float currentScore = 0;
 
     [SerializeField] private TextMeshProUGUI inGameScoreUI;
     [SerializeField] private TextMeshProUGUI inGameCoinUI;
@@ -16,7 +18,15 @@ public class ScoreManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI gameOverScoreUI;
     [SerializeField] private TextMeshProUGUI gameOverCoinUI;
 
+    [SerializeField] private TextMeshProUGUI pauseScoreUI;
+    [SerializeField] private TextMeshProUGUI pauseCoinUI;
+
+    [SerializeField] private GameObject multiplierAbilityIcon;
+    [SerializeField] private Slider multiplierAbilitySlider;
+
     private bool isMultiplierActivated = true;
+    private float multiplierTimer = 30.0f;
+    private float currentTimerLeft = 0;
 
     private void Awake()
     {
@@ -32,31 +42,48 @@ public class ScoreManager : MonoBehaviour
     }
 
 
+    private void Update()
+    {
+        UpdateScore();
+    }
+
     private void UpdateScore()
     {
         if (GameManager.Instance.CurrentGameState != GameState.InProgress)
         {
-            CancelInvoke(nameof(UpdateScore));
+            //CancelInvoke(nameof(UpdateScore));
+
+            return;
         }
 
         if (isMultiplierActivated)
         {
-            currentScore += 30;
+            currentScore += 30 * Time.deltaTime;
+
+            currentTimerLeft -= Time.deltaTime;
+
+            multiplierAbilitySlider.value = currentTimerLeft / multiplierTimer;
+
+            if (currentTimerLeft <= 0)
+            {
+                DeactivateMultiplier();
+            }
         }
         else
         {
-            currentScore += 10;
+            currentScore += 10 * Time.deltaTime;
         }
 
+        inGameScoreUI.text = Mathf.FloorToInt(currentScore).ToString();
+        pauseScoreUI.text = Mathf.FloorToInt(currentScore).ToString();
 
-        inGameScoreUI.text = currentScore.ToString();
     }
 
     public void StartGame()
     {
         ResetData();
 
-        InvokeRepeating(nameof(UpdateScore), 1.0f, 1.0f);
+        //InvokeRepeating(nameof(UpdateScore), 1.0f, 1.0f);
     }
 
     public void AddCoin()
@@ -64,6 +91,7 @@ public class ScoreManager : MonoBehaviour
         currentCoins++;
 
         inGameCoinUI.text = currentCoins.ToString();
+        pauseScoreUI.text = currentCoins.ToString();
     }
 
     public void ResetData()
@@ -79,22 +107,27 @@ public class ScoreManager : MonoBehaviour
 
     public void UpdateGameOverData()
     {
-        NetworkDataManager.Instance.SendScoreToLeaderboard(currentScore);
+        NetworkDataManager.Instance.SendScoreToLeaderboard(Mathf.FloorToInt(currentScore));
 
         gameOverCoinUI.text = currentCoins.ToString();
-        gameOverScoreUI.text = currentScore.ToString();
+        gameOverScoreUI.text = Mathf.FloorToInt(currentScore).ToString();
     }
 
     public void ActivateMultiplier()
     {
         isMultiplierActivated = true;
 
-        CancelInvoke(nameof(DeactivateMultiplier));
-        Invoke(nameof(DeactivateMultiplier), 30.0f); 
+        //CancelInvoke(nameof(DeactivateMultiplier));
+        //Invoke(nameof(DeactivateMultiplier), 30.0f);
+
+        currentTimerLeft = multiplierTimer;
+        multiplierAbilityIcon.SetActive(true);
+
     }
 
     private void DeactivateMultiplier()
     {
         isMultiplierActivated = false;
+        multiplierAbilityIcon.SetActive(false);
     }
 }
